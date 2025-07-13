@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Character Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@3.8.0/dist/full.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hide-buttons button,
+    .hide-buttons .btn,
+    .hide-buttons input[type="button"],
+    .hide-buttons input[type="submit"],
+    .hide-buttons .file-input {
+      display: none !important;
+    }
+  </style>
+  <style>
+    .tile-mode #character-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+      gap: 1rem;
+    }
+    .tile-mode #character-list .card {
+      max-width: none;
+    }
+    .tile-mode #character-list .card-body {
+      padding: 0.5rem;
+    }
+    .tile-mode #character-list .card-title {
+      font-size: 1rem;
+    }
+    .tile-mode .max-w-5xl {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .tile-mode #character-list {
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    }
+    .tile-mode #character-list .card {
+      min-width: 400px;
+    }
+  </style>
+  <!-- Load Noto Sans Thai for non-English characters -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai&display=swap" rel="stylesheet" />
+  <style>
+    /* Apply Noto Sans Thai as default font */
+    body { font-family: 'Noto Sans Thai', sans-serif; }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Character Manager</h1>
+    <div class="sticky top-0 bg-base-200 z-50 w-full p-4 flex flex-wrap gap-4 mb-4">
+      <div class="flex items-center gap-4 w-full">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-params" class="toggle toggle-primary" />
+          Hide Parameters
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-buttons" class="toggle toggle-primary" />
+          Live Mode
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-tile" class="toggle toggle-primary" />
+          Tile Mode
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" id="toggle-items" class="toggle toggle-primary" />
+          Hide Items
+        </label>
+      </div>
+      <button class="btn btn-primary" onclick="exportData()">Export JSON</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('import-input').click()">Import JSON</button>
+      <input type="file" id="import-input" accept=".json" onchange="importData(event)" class="hidden" />
+      <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarSelected(event)" />
+      <label for="add-character-modal" class="btn btn-secondary">Add Character</label>
+      <label for="add-non-character-modal" class="btn btn-accent">Add Non-Character</label>
+      <label for="badge-modal" class="btn btn-info">Manage Badges</label>
+    </div>
+    <div id="character-list" class="grid gap-4"></div>
+    <!-- Floating character menu -->
+    <div id="character-menu" class="fixed right-0 top-1/2 transform -translate-y-1/2 flex flex-col flex-wrap max-h-screen gap-2 p-2 bg-base-200 shadow-lg z-50"></div>
+  </div>
+
+  <!-- Add Character Modal -->
+  <input type="checkbox" id="add-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Character</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="newCharacterName" class="input input-bordered" placeholder="Character name" />
+    </div>
+    <div class="modal-action">
+      <label for="add-character-modal" class="btn" onclick="submitNewCharacter()">Add</label>
+      <label for="add-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Add Non-Character Modal -->
+  <input type="checkbox" id="add-non-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Non-Character</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="newNonCharacterName" class="input input-bordered" placeholder="Name" />
+    </div>
+    <div class="modal-action">
+      <label for="add-non-character-modal" class="btn" onclick="submitNewNonCharacter()">Add</label>
+      <label for="add-non-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Edit Character Modal -->
+  <input type="checkbox" id="edit-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Edit Character Name</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="editCharacterName" class="input input-bordered" />
+    </div>
+    <div class="modal-action">
+      <label for="edit-character-modal" class="btn" onclick="confirmEditCharacter()">Save</label>
+      <label for="edit-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Add Item Modal -->
+  <input type="checkbox" id="add-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Item</h3>
+    <div class="form-control">
+      <label class="label">Item Name</label>
+      <input type="text" id="newItemName" list="item-suggestions" class="input input-bordered" placeholder="Item name" />
+      <datalist id="item-suggestions"></datalist>
+      <label class="label mt-2">Amount</label>
+      <input type="number" id="newItemAmount" class="input input-bordered" value="1" min="0" />
+    </div>
+    <div class="modal-action">
+      <label for="add-item-modal" class="btn" onclick="submitNewItem()">Add</label>
+      <label for="add-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Move Item Modal -->
+  <input type="checkbox" id="move-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Move Item</h3>
+    <div class="form-control">
+      <label class="label">Destination</label>
+      <select id="moveItemDestSelect" class="select select-bordered w-full"></select>
+    </div>
+    <div class="form-control mt-2">
+      <label class="label">Quantity</label>
+      <input type="number" id="moveItemQuantity" min="1" class="input input-bordered w-full" value="1" />
+    </div>
+    <div class="modal-action">
+      <label for="move-item-modal" class="btn" onclick="confirmMoveItem()">Move</label>
+      <label for="move-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Custom Parameter Modal -->
+  <input type="checkbox" id="custom-param-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 id="custom-modal-title" class="font-bold text-lg">Add Custom Parameter</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="customParamName" list="custom-suggestions" class="input input-bordered" placeholder="Parameter name" />
+      <datalist id="custom-suggestions"></datalist>
+      <label class="label mt-2">Type</label>
+      <select id="customParamType" class="select select-bordered">
+        <option value="range">Range</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+      <div id="param-range-settings" class="flex gap-2 mt-2">
+        <input type="number" id="customParamMin" class="input input-bordered" placeholder="Min" value="0" />
+        <input type="number" id="customParamMax" class="input input-bordered" placeholder="Max" value="100" />
+      </div>
+      <label class="label mt-2">Color</label>
+      <select id="customParamColor" class="select select-bordered">
+        <option>primary</option><option>secondary</option><option>accent</option>
+        <option>info</option><option>success</option><option>warning</option><option>error</option>
+      </select>
+    </div>
+    <div class="modal-action">
+      <label id="custom-add-btn" for="custom-param-modal" class="btn" onclick="submitCustomParam()">Add</label>
+      <label id="custom-save-btn" for="custom-param-modal" class="btn hidden" onclick="confirmEditCustom()">Save</label>
+      <label for="custom-param-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Badge Management Modal -->
+  <input type="checkbox" id="badge-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box w-3/4 max-w-lg">
+    <h3 class="font-bold text-lg">Manage Badges</h3>
+    <div id="badge-list" class="space-y-2 my-4 max-h-64 overflow-y-auto"></div>
+    <hr />
+    <div class="form-control mt-4">
+      <label class="label">Name</label>
+      <input type="text" id="badgeName" class="input input-bordered" placeholder="Badge name" />
+      <label class="label mt-2">Icon (emoji) use win+;</label>
+      <input type="text" id="badgeIcon" class="input input-bordered" placeholder="😀" maxlength="2" />
+      <label class="label mt-2">Color</label>
+      <select id="badgeColor" class="select select-bordered">
+        <option>primary</option><option>secondary</option><option>accent</option>
+        <option>info</option><option>success</option><option>warning</option><option>error</option>
+      </select>
+      <label class="label mt-2">Description</label>
+      <textarea id="badgeDesc" class="textarea textarea-bordered" placeholder="Description"></textarea>
+      <label class="label mt-2">Condition (JS expression, use hunger, thirsty, custom['key'].value (can be value, type[range,checkbox],min,max))</label>
+      <textarea id="badgeCond" class="textarea textarea-bordered" placeholder="e.g. hunger>50 && custom['Health']==true"></textarea>
+    </div>
+    <div class="modal-action">
+      <label id="badge-save-btn" for="badge-modal" class="btn" onclick="submitNewBadge()">Save Badge</label>
+      <label for="badge-modal" class="btn btn-ghost">Close</label>
+    </div>
+  </div></div>
+
+  <!-- Delete Character Confirmation Modal -->
+  <input type="checkbox" id="delete-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg text-red-500">Confirm Delete</h3>
+    <p class="py-4">Are you sure you want to delete <strong id="deleteCharName"></strong>?</p>
+    <div class="modal-action">
+      <label for="delete-character-modal" class="btn btn-error" onclick="confirmDeleteCharacter()">Yes, Delete</label>
+      <label for="delete-character-modal" class="btn">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Toast -->
+  <div id="save-toast" class="toast toast-end fixed bottom-4 right-4 transition-opacity opacity-0 pointer-events-none">
+    <div class="alert alert-success"><span>✅ Saved!</span></div>
+  </div>
+
+  <!-- Summary -->
+  <div id="summary" class="max-w-5xl mx-auto mt-6 p-4 bg-base-200 rounded-lg">
+    <h2 class="text-xl font-bold mb-2">📊 Summary</h2>
+    <ul id="summary-list" class="list-disc list-inside space-y-1 text-sm"></ul>
+    <div id="item-summary" class="mt-4"></div>
+  </div>
+
+  <script>
+    let characters = [];
+    let selectedCustomIndex = null;
+    let selectedItemCharacterIndex = null;
+    let selectedDeleteCharacterIndex = null;
+    let selectedMoveSourceIndex = null;
+    let selectedMoveItemIndex = null;
+    let hideParams = false;
+    let hideButtons = false;
+    let hideItems = false;
+    let liveInterval = null;
+    let selectedAvatarIndex = null;
+    let editCharacterIndex = null;
+    let editBadgeIndex = null;
+    // Badge definitions: { name, icon, color, desc, cond }
+    let badges = [];
+    // Load badges
+    const bd = localStorage.getItem('badgeData');
+    badges = bd ? JSON.parse(bd) : [];
+
+   function saveBadges() {
+     localStorage.setItem('badgeData', JSON.stringify(badges));
+   }
+   function renderBadgeList() {
+     const bl = document.getElementById('badge-list'); bl.innerHTML = '';
+     badges.forEach((b,i) => {
+       bl.innerHTML += `<div class="flex justify-between items-center py-1">
+         <span class="badge badge-${b.color}">${b.icon} ${b.name}</span>
+         <div class="flex gap-1">
+           <button class="btn btn-xs btn-primary" onclick="editBadge(${i})">Edit</button>
+           <button class="btn btn-xs btn-error" onclick="removeBadge(${i})">Delete</button>
+         </div>
+       </div>`;
+     });
+   }
+   function removeBadge(i) {
+     badges.splice(i,1); saveBadges(); renderBadgeList(); renderCharacters();
+   }
+   function submitNewBadge() {
+     const name = document.getElementById('badgeName').value.trim();
+     const icon = document.getElementById('badgeIcon').value.trim();
+     const color = document.getElementById('badgeColor').value;
+     const desc = document.getElementById('badgeDesc').value.trim();
+     const cond = document.getElementById('badgeCond').value.trim();
+     if (!name || !cond) return alert('Name and condition required');
+     if (editBadgeIndex !== null) return confirmEditBadge();
+     badges.push({ name, icon, color, desc, cond });
+     saveBadges(); renderBadgeList(); renderCharacters();
+   }
+   
+   // Edit existing badge
+   function editBadge(i) {
+     editBadgeIndex = i;
+     const b = badges[i];
+     document.getElementById('badgeName').value = b.name;
+     document.getElementById('badgeIcon').value = b.icon;
+     document.getElementById('badgeColor').value = b.color;
+     document.getElementById('badgeDesc').value = b.desc;
+     document.getElementById('badgeCond').value = b.cond;
+     const btn = document.getElementById('badge-save-btn');
+     btn.textContent = 'Update Badge';
+     btn.onclick = confirmEditBadge;
+     document.getElementById('badge-modal').checked = true;
+   }
+   
+   function confirmEditBadge() {
+     const name = document.getElementById('badgeName').value.trim();
+     const icon = document.getElementById('badgeIcon').value.trim();
+     const color = document.getElementById('badgeColor').value;
+     const desc = document.getElementById('badgeDesc').value.trim();
+     const cond = document.getElementById('badgeCond').value.trim();
+     if (!name || !cond) return alert('Name and condition required');
+     badges[editBadgeIndex] = { name, icon, color, desc, cond };
+     saveBadges(); renderBadgeList(); renderCharacters();
+     const btn = document.getElementById('badge-save-btn');
+     btn.textContent = 'Save Badge'; btn.onclick = submitNewBadge;
+     editBadgeIndex = null;
+     document.getElementById('badge-modal').checked = false;
+   }
+   
+    document.getElementById('customParamType').addEventListener('change', e => {
+      document.getElementById('param-range-settings').style.display =
+        e.target.value === 'range' ? 'flex' : 'none';
+    });
+
+    document.getElementById('toggle-params').addEventListener('change', e => { hideParams = e.target.checked; renderCharacters(); });
+    document.getElementById('toggle-buttons').addEventListener('change', e => {
+      const liveMode = e.target.checked;
+      hideButtons = liveMode;
+      if (liveMode) {
+        document.body.classList.add('hide-buttons');
+        // start polling localStorage every second
+        liveInterval = setInterval(() => {
+          const stored = localStorage.getItem('characterData');
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              // compare serialized strings to detect changes
+              if (JSON.stringify(parsed) !== JSON.stringify(characters)) {
+                characters = parsed;
+                renderCharacters();
+              }
+            } catch {}
+          }
+        }, 1000);
+      } else {
+        document.body.classList.remove('hide-buttons');
+        if (liveInterval) {
+          clearInterval(liveInterval);
+          liveInterval = null;
+        }
+      }
+      // Disable/enable inputs appropriately in live mode
+      const allInputs = document.querySelectorAll('input[type="range"], input[type="checkbox"], input[type="text"], input[type="number"]');
+      allInputs.forEach(input => {
+        if (input.id !== 'toggle-buttons') {
+          if (liveMode) {
+            if (input.type === 'text' || input.type === 'number') {
+              input.readOnly = true;
+            } else {
+              input.disabled = true;
+            }
+          } else {
+            input.readOnly = false;
+            input.disabled = false;
+          }
+        }
+      });
+    });
+
+    document.getElementById('toggle-items').addEventListener('change', e => { hideItems = e.target.checked; renderCharacters(); });
+
+    let tileMode = false;
+    document.getElementById('toggle-tile').addEventListener('change', e => {
+      tileMode = e.target.checked;
+      if (tileMode) document.body.classList.add('tile-mode');
+      else document.body.classList.remove('tile-mode');
+    });
+
+    function renderCharacters() {
+      const container = document.getElementById('character-list');
+      container.innerHTML = '';
+
+      characters.forEach((char, i) => {
+        // compute badges for this character
+        console.log('Rendering character:', char);
+        const badgeHtml = badges.filter(b => {
+          try { return Function('char', 'with(char){ return ' + b.cond + '; }')(char); }
+          catch { return false; }
+        }).map(b =>
+          `<span class="badge badge-${b.color} tooltip" data-tip="${b.desc}">${b.icon} ${b.name}</span>`
+        ).join('');
+
+        const customHtml = Object.entries(char.custom || {}).map(([k, def]) => {
+          if (def.type === 'range') {
+            return `
+              <div class="flex items-center gap-2">
+                <button class="btn btn-xs btn-error" onclick="removeCustom(${i}, '${k}')">X</button>
+                <button class="btn btn-xs btn-outline btn-primary" onclick="promptEditCustom(${i}, '${k}')">Edit</button>
+                <span>${k}:</span>
+                <button class="btn btn-xs btn-outline" onclick="adjustCustomRange(${i}, '${k}', -1)">-</button>
+                <input type="range" min="${def.min}" max="${def.max}" value="${def.value}"
+                       onchange="updateCustomRange(${i}, '${k}', this.value)"
+                       class="range range-${def.color} w-full"> ${def.value}
+                <button class="btn btn-xs btn-outline" onclick="adjustCustomRange(${i}, '${k}', 1)">+</button>
+              </div>`;
+          } else {
+            return `
+              <div class="flex items-center gap-2">
+                <button class="btn btn-xs btn-error" onclick="removeCustom(${i}, '${k}')">X</button>
+                <button class="btn btn-xs btn-outline btn-primary" onclick="promptEditCustom(${i}, '${k}')">Edit</button>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" class="toggle toggle-${def.color}" ${def.value ? 'checked' : ''}
+                         onchange="toggleCustom(${i}, '${k}', this.checked)">
+                  ${k}
+                </label>
+              </div>`;
+          }
+        }).join('');
+
+        const itemsHtml = char.items.map((it, j) => `
+          <li class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <button class="btn btn-xs btn-error" onclick="removeItem(${i}, ${j})">X</button>
+              <input type="text" class="input input-sm"
+                     value="${it.name}"
+                     size="${it.name.length || 1}"
+                     oninput="this.size = Math.max(this.value.length, 1)"
+                     onchange="updateItemName(${i}, ${j}, this.value)" />
+              <label for="move-item-modal" class="btn btn-xs btn-outline" onclick="promptMove(${i}, ${j})">Move</label>
+            </div>
+            <input type="number" min="0" class="input input-sm input-secondary w-20"
+                   value="${it.amount}"
+                   onchange="updateItemAmount(${i}, ${j}, this.value)" />
+          </li>`).join('');
+
+        container.innerHTML += `
+          <div id="char-${i}" class="card bg-base-200 shadow-xl">
+            <div class="card-body">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                  <button class="btn btn-xs btn-ghost drag-handle cursor-move" title="Drag to reorder">☰</button>
+                  <h2 class="card-title">${char.name}</h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button class="btn btn-xs btn-outline" onclick="moveCharacterUp(${i})" ${i === 0 ? 'disabled' : ''}>↑</button>
+                  <button class="btn btn-xs btn-outline" onclick="moveCharacterDown(${i})" ${i === characters.length - 1 ? 'disabled' : ''}>↓</button>
+                  <label for="edit-character-modal" class="btn btn-xs btn-outline btn-primary"
+                         onclick="promptEditCharacter(${i})">Edit</label>
+                  <label for="delete-character-modal" class="btn btn-xs btn-outline btn-error"
+                         onclick="promptDelete(${i})">Delete</label>
+                </div>
+              </div>
+              <div class="mb-4 flex items-start gap-4">
+                <!-- Avatar and avatar controls -->
+                <div class="flex flex-col items-center">
+                  <div class="w-[140.84px] h-[140.84px] rounded-full overflow-hidden bg-base-300">
+                    ${char.avatar ? `<img src="${char.avatar}" class="object-cover w-full h-full"/>`
+                                   : `<span class="text-sm opacity-50">No Image</span>`}
+                  </div>
+                  <div class="mt-2 flex space-x-2">
+                    <button class="btn btn-xs btn-outline" onclick="promptChangeAvatar(${i})">Change</button>
+                    <button class="btn btn-xs btn-error" onclick="removeAvatar(${i})" ${char.avatar ? '' : 'disabled'}>Remove</button>
+                  </div>
+                </div>
+                <!-- Badge container to the right of avatar -->
+                <div class="flex flex-wrap gap-2 badge-container p-2">
+                  ${badgeHtml}
+                </div>
+              </div>
+
+              ${!hideParams && char.hasOwnProperty('hunger') ? `
+                <p class="flex items-center gap-2">Hunger:
+                  <button class="btn btn-xs btn-outline" onclick="adjustStat(${i}, 'hunger', -1)">-</button>
+                  <input type="range" min="0" max="100" value="${char.hunger}"
+                         onchange="updateStat(${i}, 'hunger', this.value)"
+                         class="range range-warning w-full"> ${char.hunger}
+                  <button class="btn btn-xs btn-outline" onclick="adjustStat(${i}, 'hunger', 1)">+</button>
+                </p>` : ''}
+
+              ${!hideParams && char.hasOwnProperty('thirsty') ? `
+                <p class="flex items-center gap-2">Thirsty:
+                  <button class="btn btn-xs btn-outline" onclick="adjustStat(${i}, 'thirsty', -1)">-</button>
+                  <input type="range" min="0" max="100" value="${char.thirsty}"
+                         onchange="updateStat(${i}, 'thirsty', this.value)"
+                         class="range range-info w-full"> ${char.thirsty}
+                  <button class="btn btn-xs btn-outline" onclick="adjustStat(${i}, 'thirsty', 1)">+</button>
+                </p>` : ''}
+
+              ${!hideParams ? customHtml : ''}
+              ${!hideParams ? `<label for="custom-param-modal" class="btn btn-sm btn-accent my-2" onclick="addParameter(${i})">Add Custom Parameter</label>` : ''}
+
+              ${!hideItems ? `<ul class="mt-2 space-y-1">${itemsHtml}</ul>
+              <label for="add-item-modal" class="btn btn-sm btn-success mt-2"
+                     onclick="promptAddItem(${i})">Add Item</label>` : ''}
+            </div>
+          </div>`;
+      });
+
+      updateCharacterMenu();
+      initDragAndDrop();
+      saveToLocalStorage();
+      updateSummary();
+    }
+
+    function submitNewCharacter() {
+      const nm = document.getElementById('newCharacterName').value.trim();
+      if (nm) characters.push({ name: nm, hunger: 50, thirsty: 50, items: [], custom: {} });
+      document.getElementById('newCharacterName').value = '';
+      renderCharacters();
+    }
+    function submitNewNonCharacter() {
+      const nm = document.getElementById('newNonCharacterName').value.trim();
+      if (nm) characters.push({ name: nm, items: [], custom: {} });
+      document.getElementById('newNonCharacterName').value = '';
+      renderCharacters();
+    }
+
+    function promptDelete(i) {
+      selectedDeleteCharacterIndex = i;
+      document.getElementById('deleteCharName').textContent = characters[i].name;
+    }
+    function confirmDeleteCharacter() {
+      characters.splice(selectedDeleteCharacterIndex, 1);
+      selectedDeleteCharacterIndex = null;
+      renderCharacters();
+    }
+
+    function promptAddItem(i) {
+      selectedItemCharacterIndex = i; }
+    function submitNewItem() {
+      const nm = document.getElementById('newItemName').value.trim();
+      const am = parseInt(document.getElementById('newItemAmount').value, 10);
+      if (nm && !isNaN(am)) characters[selectedItemCharacterIndex].items.push({ name: nm, amount: am });
+      document.getElementById('newItemName').value = '';
+      document.getElementById('newItemAmount').value = '1';
+      renderCharacters();
+    }
+
+    function promptMove(ci, ii) {
+      selectedMoveSourceIndex = ci;
+      selectedMoveItemIndex = ii;
+      const sel = document.getElementById('moveItemDestSelect');
+      sel.innerHTML = characters.map((c, idx) => `<option value="${idx}">${c.name}</option>`).join('');
+      // default move quantity to the full amount of the selected item
+      document.getElementById('moveItemQuantity').value = characters[ci].items[ii].amount;
+    }
+
+    function confirmMoveItem() {
+      const dest = parseInt(document.getElementById('moveItemDestSelect').value, 10);
+      const qty = parseInt(document.getElementById('moveItemQuantity').value, 10) || 1;
+      const src = selectedMoveSourceIndex;
+      const idx = selectedMoveItemIndex;
+      if (dest !== src) {
+        const sourceItems = characters[src].items;
+        const item = sourceItems[idx];
+        const moveQty = Math.min(qty, item.amount);
+        // subtract or remove from source
+        if (moveQty >= item.amount) {
+          sourceItems.splice(idx, 1);
+        } else {
+          item.amount -= moveQty;
+        }
+        // merge into destination
+        const destItems = characters[dest].items;
+        const existing = destItems.find(it => it.name === item.name);
+        if (existing) {
+          existing.amount += moveQty;
+        } else {
+          destItems.push({ name: item.name, amount: moveQty });
+        }
+        // reset selection
+        selectedMoveSourceIndex = null;
+        selectedMoveItemIndex = null;
+        renderCharacters();
+      }
+    }
+
+    function updateItemName(ci, ii, v) {
+      characters[ci].items[ii].name = v; saveToLocalStorage();
+    }
+    // Add handler for item amount changes to save to localStorage
+    function updateItemAmount(ci, ii, v) {
+      characters[ci].items[ii].amount = parseInt(v, 10) || 0;
+      saveToLocalStorage();
+    }
+    function removeItem(ci, ii) {
+      characters[ci].items.splice(ii, 1); renderCharacters();
+    }
+
+    function addParameter(i) { selectedCustomIndex = i; }
+    function submitCustomParam() {
+      const nm = document.getElementById('customParamName').value.trim();
+      const type = document.getElementById('customParamType').value;
+      let min = 0, max = 100;
+      if (type === 'range') {
+        min = parseInt(document.getElementById('customParamMin').value, 10) || 0;
+        max = parseInt(document.getElementById('customParamMax').value, 10) || min;
+      }
+      const color = document.getElementById('customParamColor').value;
+      if (!nm) return;
+      const c = characters[selectedCustomIndex]; if (!c.custom) c.custom = {};
+      if (c.custom.hasOwnProperty(nm)) { alert('Parameter already exists.'); return; }
+      c.custom[nm] = { type, min, max, color, value: type === 'checkbox' ? false : min };
+      renderCharacters();
+    }
+    function removeCustom(ci, key) { delete characters[ci].custom[key]; renderCharacters(); }
+    function updateCustomRange(ci, key, v) { characters[ci].custom[key].value = parseInt(v, 10); renderCharacters(); }
+    function toggleCustom(ci, key, chk) { characters[ci].custom[key].value = chk; saveToLocalStorage(); renderCharacters(); }
+    function updateStat(ci, stat, v) { characters[ci][stat] = parseInt(v, 10); renderCharacters(); }
+    function adjustStat(ci, stat, delta) {
+      const newValue = Math.min(100, Math.max(0, characters[ci][stat] + delta));
+      updateStat(ci, stat, newValue);
+    }
+    function adjustCustomRange(ci, key, delta) {
+      const def = characters[ci].custom[key];
+      const newValue = Math.min(def.max, Math.max(def.min, def.value + delta));
+      updateCustomRange(ci, key, newValue);
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem('characterData', JSON.stringify(characters));
+      showToast(); updateSummary();
+    }
+    function showToast() {
+      const t = document.getElementById('save-toast');
+      t.classList.replace('opacity-0','opacity-100');
+      setTimeout(() => t.classList.replace('opacity-100','opacity-0'), 1000);
+    }
+    function exportData() {
+      const data = { characters: characters, badges: badges };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download='characters.json'; a.click();
+      URL.revokeObjectURL(url);
+    }
+    function importData(e) {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          // Load characters
+          characters = data.characters || data;
+          // Load badges if present
+          if (data.badges) {
+            badges = data.badges;
+            saveBadges();
+            renderBadgeList();
+          }
+          renderCharacters();
+          updateSummary();
+        } catch {
+          alert('Invalid JSON');
+        }
+      };
+      r.readAsText(f);
+    }
+    function updateSummary() {
+      console.log('Updating summary...');
+      const sl = document.getElementById('summary-list');
+      const tc = characters.length;
+      const ti = characters.reduce((sum,c) => sum + c.items.length, 0);
+      const ps = new Set(); characters.forEach(c => c.custom && Object.keys(c.custom).forEach(p => ps.add(p)));
+      sl.innerHTML = `
+        <li>Total Characters: <strong>${tc}</strong></li>
+        <li>Total Items: <strong>${ti}</strong></li>
+        <li>Parameters: <strong>${[...ps].join(',')||'None'}</strong></li>`;
+      // build and display item summary table
+      const itemTotals = {};
+      characters.forEach(c => c.items.forEach(it => itemTotals[it.name] = (itemTotals[it.name]||0) + it.amount));
+      const itemNames = Object.keys(itemTotals).sort();
+      document.getElementById('item-summary').innerHTML = `
+        <table class="table w-full">
+          <thead><tr><th>Item</th><th>Total</th></tr></thead>
+          <tbody>
+            ${itemNames.map(n => `<tr><td>${n}</td><td>${itemTotals[n]}</td></tr>`).join('')}
+          </tbody>
+        </table>`;
+      // update item suggestions for add-item input
+      const ds = document.getElementById('item-suggestions');
+      ds.innerHTML = itemNames.map(n => `<option value="${n}">`).join('');
+      // update custom parameter suggestions
+      const cs = document.getElementById('custom-suggestions');
+      const paramSet = new Set();
+      characters.forEach(c => c.custom && Object.keys(c.custom).forEach(p => paramSet.add(p)));
+      const paramNames = [...paramSet].sort();
+      cs.innerHTML = paramNames.map(p => `<option value="${p}">`).join('');
+      
+    }
+
+    // Initialize
+    const ld = localStorage.getItem('characterData');
+    characters = ld ? JSON.parse(ld) : [
+      { name:'Rio', hunger:70, thirsty:40, items:[{name:'Apple',amount:2}], custom:{} }
+    ];
+    renderCharacters();
+    renderBadgeList();
+    // Ensure renderCharacters has finished before continuing
+    // If renderCharacters is synchronous, this line is reached after it finishes
+    //updateSummary();
+
+
+    function promptEditCharacter(i) {
+      editCharacterIndex = i;
+      document.getElementById('editCharacterName').value = characters[i].name;
+    }
+    function confirmEditCharacter() {
+      const newName = document.getElementById('editCharacterName').value.trim();
+      if (newName && editCharacterIndex !== null) {
+        characters[editCharacterIndex].name = newName;
+        renderCharacters();
+        editCharacterIndex = null;
+      }
+    }
+
+    function updateCharacterMenu() {
+      const menu = document.getElementById('character-menu');
+      menu.innerHTML = '';
+      characters.forEach((char, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline text-sm w-[100px] h-[100px] overflow-hidden whitespace-normal';
+        btn.textContent = char.name;
+        btn.onclick = () => {
+          const el = document.getElementById(`char-${i}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        menu.appendChild(btn);
+      });
+    }
+
+    // Add variables for editing custom
+    let selectedCustomKey = null;
+
+    function promptEditCustom(ci, key) {
+      selectedCustomIndex = ci;
+      selectedCustomKey = key;
+      const def = characters[ci].custom[key];
+      document.getElementById('custom-modal-title').textContent = 'Edit Custom Parameter';
+      document.getElementById('customParamName').value = key;
+      document.getElementById('customParamType').value = def.type;
+      document.getElementById('param-range-settings').style.display = def.type === 'range' ? 'flex' : 'none';
+      document.getElementById('customParamMin').value = def.min;
+      document.getElementById('customParamMax').value = def.max;
+      document.getElementById('customParamColor').value = def.color;
+      document.getElementById('custom-add-btn').classList.add('hidden');
+      document.getElementById('custom-save-btn').classList.remove('hidden');
+      document.getElementById('custom-param-modal').checked = true;
+    }
+
+    function confirmEditCustom() {
+      const nm = document.getElementById('customParamName').value.trim();
+      const type = document.getElementById('customParamType').value;
+      let min = 0, max = 100;
+      if (type === 'range') {
+        min = parseInt(document.getElementById('customParamMin').value, 10) || 0;
+        max = parseInt(document.getElementById('customParamMax').value, 10) || min;
+      }
+      const color = document.getElementById('customParamColor').value;
+      if (!nm) return;
+      const c = characters[selectedCustomIndex];
+      const oldKey = selectedCustomKey;
+      const def = c.custom[oldKey];
+      // determine value: preserve existing or default
+      let value = def.value;
+      if (type === 'range') value = Math.min(Math.max(value, min), max);
+      else if (type === 'checkbox') value = !!value;
+      // remove old key if name changed
+      if (nm !== oldKey) {
+        delete c.custom[oldKey];
+      }
+      c.custom[nm] = { type, min, max, color, value };
+      // reset modal
+      selectedCustomIndex = null;
+      selectedCustomKey = null;
+      document.getElementById('custom-modal-title').textContent = 'Add Custom Parameter';
+      document.getElementById('custom-add-btn').classList.remove('hidden');
+      document.getElementById('custom-save-btn').classList.add('hidden');
+      document.getElementById('custom-param-modal').checked = false;
+      renderCharacters();
+    }
+
+    // Trigger file picker for avatar change
+    function promptChangeAvatar(ci) {
+      selectedAvatarIndex = ci;
+      document.getElementById('avatar-input').click();
+    }
+
+    // Handle selected avatar file
+    function handleAvatarSelected(e) {
+      const file = e.target.files[0];
+      if (!file || selectedAvatarIndex === null) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 100;
+          canvas.height = 100;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, 100, 100);
+          const jpgData = canvas.toDataURL('image/jpeg', 0.8);
+          characters[selectedAvatarIndex].avatar = jpgData;
+          selectedAvatarIndex = null;
+          e.target.value = null;
+          saveToLocalStorage(); renderCharacters();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Remove avatar from character
+    function removeAvatar(ci) {
+      delete characters[ci].avatar;
+      saveToLocalStorage(); renderCharacters();
+    }
+
+    // Add functions for moving characters up and down
+    function moveCharacterUp(index) {
+      if (index > 0) {
+        const temp = characters[index];
+        characters[index] = characters[index - 1];
+        characters[index - 1] = temp;
+        renderCharacters();
+      }
+    }
+
+    function moveCharacterDown(index) {
+      if (index < characters.length - 1) {
+        const temp = characters[index];
+        characters[index] = characters[index + 1];
+        characters[index + 1] = temp;
+        renderCharacters();
+      }
+    }
+
+    // Initialize drag-and-drop reordering
+    function initDragAndDrop() {
+      const el = document.getElementById('character-list');
+      // destroy previous instance if exists
+      if (window.dragSort) window.dragSort.destroy();
+
+      // Check if Sortable exists before using it
+      if (typeof Sortable === 'undefined') return;
+
+      window.dragSort = Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: evt => {
+          const { oldIndex, newIndex } = evt;
+          if (oldIndex !== newIndex) {
+            const moved = characters.splice(oldIndex, 1)[0];
+            characters.splice(newIndex, 0, moved);
+            renderCharacters();
+          }
+        }
+      });
+    }
+
+    // Utility: log each badge with list of matching character names
+    function logBadgeAssignments() {
+      badges.forEach((b) => {
+        const matchedNames = characters
+          .filter(char => {
+            try { return Function('char','with(char){ return ' + b.cond + '; }')(char); }
+            catch { return false; }
+          })
+          .map(char => char.name);
+        console.log(`Badge "${b.name}" applies to: [${matchedNames.join(', ')}]`);
+      });
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+
+</body>
+</html>

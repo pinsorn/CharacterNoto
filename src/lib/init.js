@@ -7,6 +7,18 @@ import { putBlob, newImageId } from './blobstore.js';
 // Order matches legacy: seed characters if empty → validate wiki → add missing items from inventories.
 export function initData() {
   if (get(characters).length === 0) characters.set(seedCharacters());
+
+  // Ensure every character has a stable id (the relationship graph references characters by id).
+  const chars = get(characters);
+  let idChanged = false;
+  for (const c of chars) {
+    if (!c.id) {
+      c.id = crypto.randomUUID();
+      idChanged = true;
+    }
+  }
+  if (idChanged) characters.set(chars);
+
   let db = validateItemDatabase(get(itemDatabase));
   db = addMissingItemsFromInventories(db, get(characters));
   itemDatabase.set(db);

@@ -37,6 +37,7 @@
     if (drawing) cursor = normPoint(e);
   }
   function startDraw() {
+    editMode = false;
     draftPoints = [];
     cursor = null;
     drawing = true;
@@ -62,9 +63,60 @@
   }
 
   function openRegion(id) {
-    if (drawing) return;
+    if (drawing || editMode) return;
     selectedId = id;
     editorOpen = true;
+  }
+
+  // --- edit shapes (move / reshape regions) -------------------------------
+  let editMode = $state(false);
+  let drag = $state(null); // { type:'vertex'|'body', regionId, vIdx?, last? }
+  let live = $state(null); // { regionId, points } preview during a drag
+
+  function toggleEdit() {
+    editMode = !editMode;
+    if (editMode) cancelDraw();
+  }
+  function regionPoints(r) {
+    return live && live.regionId === r.id ? live.points : r.points;
+  }
+  function startVertexDrag(e, r, vIdx) {
+    e.stopPropagation();
+    drag = { type: 'vertex', regionId: r.id, vIdx };
+    live = { regionId: r.id, points: r.points.map((p) => ({ ...p })) };
+  }
+  function startBodyDrag(e, r) {
+    if (!editMode) return;
+    e.stopPropagation();
+    drag = { type: 'body', regionId: r.id, last: normPoint(e) };
+    live = { regionId: r.id, points: r.points.map((p) => ({ ...p })) };
+  }
+  function onEditMove(e) {
+    if (!drag || !live) return;
+    const pt = normPoint(e);
+    if (drag.type === 'vertex') {
+      live = { regionId: live.regionId, points: live.points.map((p, i) => (i === drag.vIdx ? pt : p)) };
+    } else {
+      const dx = pt.x - drag.last.x;
+      const dy = pt.y - drag.last.y;
+      live = {
+        regionId: live.regionId,
+        points: live.points.map((p) => ({ x: clamp01(p.x + dx), y: clamp01(p.y + dy) })),
+      };
+      drag.last = pt;
+    }
+  }
+  function endEditDrag() {
+    if (drag && live) {
+      const { regionId, points } = live;
+      mapData.update((d) => {
+        const r = d.regions.find((x) => x.id === regionId);
+        if (r) r.points = points;
+        return d;
+      });
+    }
+    drag = null;
+    live = null;
   }
 
   const pts = (points) => points.map((p) => `${p.x},${p.y}`).join(' ');
@@ -112,6 +164,11 @@
       <button class="btn btn-sm btn-ghost" onclick={cancelDraw}>Cancel</button>
     {:else}
       <button class="btn btn-sm btn-primary" onclick={startDraw}>Draw Region</button>
+      {#if $mapData.regions.length}
+        <button class="btn btn-sm {editMode ? 'btn-accent' : 'btn-outline'}" onclick={toggleEdit}>
+          {editMode ? 'Done Editing' : 'Edit Shapes'}
+        </button>
+      {/if}
     {/if}
   </div>
 
@@ -134,25 +191,29 @@
       preserveAspectRatio="none"
       style={drawing ? 'cursor: crosshair' : ''}
       onclick={onSvgClick}
-      onmousemove={onSvgMove}
+      onmousemove={(e) => { onSvgMove(e); onEditMove(e); }}
+      onmouseup={endEditDrag}
+      onmouseleave={endEditDrag}
     >
       {#each $mapData.regions as r (r.id)}
+        {@const rp = regionPoints(r)}
         <polygon
-          points={pts(r.points)}
+          points={pts(rp)}
           fill={hex(r.color)}
           fill-opacity="0.35"
           stroke={hex(r.color)}
           stroke-width="2"
           vector-effect="non-scaling-stroke"
-          style={drawing ? 'pointer-events: none' : 'cursor: pointer'}
+          style={drawing ? 'pointer-events: none' : editMode ? 'cursor: move' : 'cursor: pointer'}
           role="button"
           tabindex="-1"
+          onmousedown={(e) => startBodyDrag(e, r)}
           onclick={(e) => {
             e.stopPropagation();
             openRegion(r.id);
           }}
         />
-        {@const c = centroid(r.points)}
+        {@const c = centroid(rp)}
         <text
           x={c.x}
           y={c.y}
@@ -161,6 +222,18 @@
           text-anchor="middle"
           style="pointer-events: none; paint-order: stroke; stroke: black; stroke-width: 0.004;"
         >{r.name}</text>
+        {#if editMode}
+          {#each rp as p, vi}
+            <circle
+              cx={p.x} cy={p.y} r="0.012"
+              fill="white" stroke={hex(r.color)} stroke-width="2"
+              vector-effect="non-scaling-stroke"
+              style="cursor: grab"
+              role="button" tabindex="-1"
+              onmousedown={(e) => startVertexDrag(e, r, vi)}
+            />
+          {/each}
+        {/if}
       {/each}
 
       <!-- Draft polygon being drawn -->

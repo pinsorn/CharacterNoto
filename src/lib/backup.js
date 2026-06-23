@@ -2,7 +2,7 @@
 // click / import), never in the live-save path — so there's no per-change cost.
 import JSZip from 'jszip';
 import { get } from 'svelte/store';
-import { characters, badges, itemDatabase, craftingRecipes, mapData } from './stores.js';
+import { characters, badges, itemDatabase, craftingRecipes, mapData, relationships } from './stores.js';
 import { allBlobs, putBlob } from './blobstore.js';
 
 export async function exportZip() {
@@ -17,6 +17,7 @@ export async function exportZip() {
         itemDatabase: get(itemDatabase),
         craftingRecipes: get(craftingRecipes),
         mapData: get(mapData),
+        relationships: get(relationships),
       },
       null,
       2
@@ -55,4 +56,5 @@ export async function importZip(file) {
   if (manifest.itemDatabase) itemDatabase.set(manifest.itemDatabase);
   if (manifest.craftingRecipes) craftingRecipes.set(manifest.craftingRecipes);
   if (manifest.mapData) mapData.set(manifest.mapData);
+  if (manifest.relationships) relationships.set(manifest.relationships);
 }

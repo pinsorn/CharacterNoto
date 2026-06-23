@@ -49,3 +49,5 @@ export const itemDatabase = persisted('itemDatabase', []);
 export const craftingRecipes = persisted('craftingRecipes', []);
 // Map feature: regions + the IndexedDB id of the background image (image bytes live in blobstore).
 export const mapData = persisted('mapData', { backgroundId: null, regions: [] });
+// Character relationship graph: directed labelled edges + saved node positions (by character id).
+export const relationships = persisted('relationships', { edges: [], positions: {} });

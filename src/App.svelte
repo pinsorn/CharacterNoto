@@ -3,6 +3,8 @@
   import Items from './components/Items.svelte';
   import Crafting from './components/Crafting.svelte';
   import MapTab from './components/MapTab.svelte';
+  import DiceRoller from './components/DiceRoller.svelte';
+  import RelationshipGraph from './components/RelationshipGraph.svelte';
   import Toast from './components/Toast.svelte';
   import UseItemModal from './components/UseItemModal.svelte';
   import CraftingModal from './components/CraftingModal.svelte';
@@ -15,6 +17,8 @@
     { id: 'items', label: 'Items' },
     { id: 'crafting', label: 'Crafting' },
     { id: 'map', label: 'Map' },
+    { id: 'relationships', label: 'Relationships' },
+    { id: 'dice', label: 'Dice' },
   ];
 
   let backupInput;
@@ -58,6 +62,8 @@
   <div class:hidden={tab !== 'items'}><Items /></div>
   <div class:hidden={tab !== 'crafting'}><Crafting /></div>
   <div class:hidden={tab !== 'map'}><MapTab /></div>
+  <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
+  <div class:hidden={tab !== 'dice'}><DiceRoller /></div>
 </div>
 
 <Toast />

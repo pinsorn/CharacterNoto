@@ -3,6 +3,19 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-06-24
+
+### Added
+- **Dice Roller** tab — standard notation (`2d6+3`, `1d20-1`, `2d6+1d4+2`), quick-roll buttons (d4–d100), per-roll breakdown and a session history.
+- **Character Relationship Graph** tab — directed, labelled relationships between characters rendered as an interactive SVG graph; draggable nodes with persisted positions. Characters now carry a stable `id` (auto-assigned on load).
+- **Region reshape/move** on the Map — an "Edit Shapes" mode adds draggable vertex handles (reshape) and lets you drag a region body to move it; changes persist.
+
+### Changed
+- Zip backup now also bundles the relationship graph (`relationships`).
+
+### Tests
+- Added `src/lib/dice.test.mjs` (7). Suites now: logic (15) + loot (7) + dice (7).
+
 ## [3.0.0] - 2026-06-23
 
 ### Major: Framework migration (vanilla JS → Svelte 5) + Map & Region Loot

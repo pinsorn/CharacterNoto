@@ -59,7 +59,7 @@
     const name = newName.trim();
     if (name) {
       characters.update((list) => {
-        list.push({ name, hunger: 50, thirsty: 50, items: [], custom: {} });
+        list.push({ id: crypto.randomUUID(), name, hunger: 50, thirsty: 50, items: [], custom: {} });
         return list;
       });
     }
@@ -74,7 +74,7 @@
     const name = newName.trim();
     if (name) {
       characters.update((list) => {
-        list.push({ name, items: [], custom: {} });
+        list.push({ id: crypto.randomUUID(), name, items: [], custom: {} });
         return list;
       });
     }

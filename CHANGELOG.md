@@ -3,6 +3,29 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-06-23
+
+### Major: Framework migration (vanilla JS → Svelte 5) + Map & Region Loot
+
+Complete rewrite of the app onto **Svelte 5 + Vite + Tailwind 3 / DaisyUI 4**, preserving all existing functionality, plus a new Map feature. The legacy single-file app is kept under `legacy/` for reference.
+
+#### Added - Map & Region Loot
+- **Map tab** with an uploadable background image (stored in IndexedDB).
+- **Freeform polygon regions** drawn on an SVG overlay (normalized coords, survive resize).
+- **Per-region loot tables**: each item has a **% drop chance**, a per-roll quantity, and either a **depleting stock** or an **infinite** (loot-table) flag.
+- **Roll**: independent per-item drop; rolled quantity (toggle to randomize or use the full amount); finite items deplete their stock; results can be **sent to a character's inventory**.
+- **Zip backup** (Export/Import `.zip`): full-fidelity backup bundling `manifest.json` + images, built on demand.
+
+#### Changed - Architecture
+- Reactive Svelte stores replace the global-namespace managers, manual `innerHTML` re-renders, and the 1-second `localStorage` polling.
+- Images (avatars + map backgrounds) moved to **IndexedDB** as Blobs (avoids the localStorage quota / silent-data-loss risk); avatars auto-migrate from legacy base64 on first load.
+- Single shared toast and reactive modals replace the duplicated toast + `setTimeout` modal-close hacks.
+
+#### Notes
+- Existing `localStorage` data (characters/badges/items/recipes) loads unchanged.
+- The legacy "Live Mode" 1s polling is superseded by reactive stores (removed).
+- Pure logic covered by self-checks: `src/lib/logic.test.mjs` (15) and `src/lib/loot.test.mjs` (7).
+
 ## [2.0.0] - 2025-07-13
 
 ###  Major Update: Complete Character Management Ecosystem

@@ -1,0 +1,203 @@
+<script>
+  // Map tab: uploadable background image + freeform polygon regions drawn on an SVG overlay.
+  // Region geometry is stored in normalized 0..1 coords (survives resize). Editing/rolling
+  // lives in RegionEditor.
+  import { mapData } from '../lib/stores.js';
+  import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
+  import { fileToImageBlob } from '../lib/avatar.js';
+  import BlobImage from './BlobImage.svelte';
+  import RegionEditor from './RegionEditor.svelte';
+
+  const COLOR_HEX = {
+    primary: '#7c3aed', secondary: '#db2777', accent: '#06b6d4',
+    info: '#3abff8', success: '#36d399', warning: '#fbbd23', error: '#f87272',
+  };
+  const hex = (c) => COLOR_HEX[c] ?? COLOR_HEX.primary;
+  const clamp01 = (n) => Math.min(1, Math.max(0, n));
+
+  let svgEl;
+  let drawing = $state(false);
+  let draftPoints = $state([]);
+  let cursor = $state(null); // rubber-band endpoint while drawing
+  let bgInput;
+
+  // Editor
+  let editorOpen = $state(false);
+  let selectedId = $state(null);
+
+  function normPoint(e) {
+    const rect = svgEl.getBoundingClientRect();
+    return { x: clamp01((e.clientX - rect.left) / rect.width), y: clamp01((e.clientY - rect.top) / rect.height) };
+  }
+  function onSvgClick(e) {
+    if (!drawing) return;
+    draftPoints = [...draftPoints, normPoint(e)];
+  }
+  function onSvgMove(e) {
+    if (drawing) cursor = normPoint(e);
+  }
+  function startDraw() {
+    draftPoints = [];
+    cursor = null;
+    drawing = true;
+  }
+  function finishRegion() {
+    if (draftPoints.length < 3) {
+      alert('A region needs at least 3 points.');
+      return;
+    }
+    const name = prompt('Region name?')?.trim();
+    if (name) {
+      mapData.update((d) => {
+        d.regions.push({ id: crypto.randomUUID(), name, color: 'primary', points: draftPoints, items: [] });
+        return d;
+      });
+    }
+    cancelDraw();
+  }
+  function cancelDraw() {
+    draftPoints = [];
+    cursor = null;
+    drawing = false;
+  }
+
+  function openRegion(id) {
+    if (drawing) return;
+    selectedId = id;
+    editorOpen = true;
+  }
+
+  const pts = (points) => points.map((p) => `${p.x},${p.y}`).join(' ');
+  const centroid = (points) => ({
+    x: points.reduce((s, p) => s + p.x, 0) / points.length,
+    y: points.reduce((s, p) => s + p.y, 0) / points.length,
+  });
+
+  async function onBgSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = null;
+    if (!file) return;
+    const blob = await fileToImageBlob(file);
+    if (!blob) return;
+    const oldId = $mapData.backgroundId;
+    const id = newImageId();
+    await putBlob(id, blob);
+    if (oldId) delBlob(oldId);
+    mapData.update((d) => {
+      d.backgroundId = id;
+      return d;
+    });
+  }
+  function clearBg() {
+    const oldId = $mapData.backgroundId;
+    if (oldId) delBlob(oldId);
+    mapData.update((d) => {
+      d.backgroundId = null;
+      return d;
+    });
+  }
+</script>
+
+<div>
+  <!-- Toolbar -->
+  <div class="flex flex-wrap gap-2 items-center mb-4">
+    <h2 class="text-2xl font-bold mr-auto">Map</h2>
+    <button class="btn btn-sm btn-secondary" onclick={() => bgInput.click()}>Upload Map Image</button>
+    <input type="file" accept="image/*" class="hidden" bind:this={bgInput} onchange={onBgSelected} />
+    {#if $mapData.backgroundId}
+      <button class="btn btn-sm btn-ghost" onclick={clearBg}>Clear Background</button>
+    {/if}
+    {#if drawing}
+      <button class="btn btn-sm btn-success" onclick={finishRegion}>Finish ({draftPoints.length})</button>
+      <button class="btn btn-sm btn-ghost" onclick={cancelDraw}>Cancel</button>
+    {:else}
+      <button class="btn btn-sm btn-primary" onclick={startDraw}>Draw Region</button>
+    {/if}
+  </div>
+
+  {#if drawing}
+    <div class="alert alert-info py-2 mb-2">
+      <span>Click to add points (≥3), then <strong>Finish</strong>. Esc-free: use Cancel.</span>
+    </div>
+  {/if}
+
+  <!-- Map canvas -->
+  <div class="relative w-full bg-base-300 rounded overflow-hidden" style="aspect-ratio: 16 / 9;">
+    {#if $mapData.backgroundId}
+      <BlobImage id={$mapData.backgroundId} alt="map" class="absolute inset-0 w-full h-full object-cover" />
+    {/if}
+    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+    <svg
+      bind:this={svgEl}
+      class="absolute inset-0 w-full h-full"
+      viewBox="0 0 1 1"
+      preserveAspectRatio="none"
+      style={drawing ? 'cursor: crosshair' : ''}
+      onclick={onSvgClick}
+      onmousemove={onSvgMove}
+    >
+      {#each $mapData.regions as r (r.id)}
+        <polygon
+          points={pts(r.points)}
+          fill={hex(r.color)}
+          fill-opacity="0.35"
+          stroke={hex(r.color)}
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+          style={drawing ? 'pointer-events: none' : 'cursor: pointer'}
+          role="button"
+          tabindex="-1"
+          onclick={(e) => {
+            e.stopPropagation();
+            openRegion(r.id);
+          }}
+        />
+        {@const c = centroid(r.points)}
+        <text
+          x={c.x}
+          y={c.y}
+          fill="white"
+          font-size="0.035"
+          text-anchor="middle"
+          style="pointer-events: none; paint-order: stroke; stroke: black; stroke-width: 0.004;"
+        >{r.name}</text>
+      {/each}
+
+      <!-- Draft polygon being drawn -->
+      {#if drawing && draftPoints.length > 0}
+        <polyline
+          points={pts(draftPoints) + (cursor ? ` ${cursor.x},${cursor.y}` : '')}
+          fill="none"
+          stroke="#7c3aed"
+          stroke-width="2"
+          vector-effect="non-scaling-stroke"
+          stroke-dasharray="0.01"
+        />
+        {#each draftPoints as p}
+          <circle cx={p.x} cy={p.y} r="0.008" fill="#7c3aed" />
+        {/each}
+      {/if}
+    </svg>
+  </div>
+
+  <!-- Region list -->
+  <div class="mt-4">
+    {#if $mapData.regions.length === 0}
+      <div class="text-center text-gray-500 py-4">No regions yet. Click "Draw Region" and outline an area on the map.</div>
+    {:else}
+      <div class="grid gap-2">
+        {#each $mapData.regions as r (r.id)}
+          <div class="flex items-center justify-between bg-base-200 p-2 rounded">
+            <div class="flex items-center gap-2">
+              <span class="badge" style={`background:${hex(r.color)};border:none;color:white`}>{r.name}</span>
+              <span class="text-sm opacity-70">{r.items.length} item(s)</span>
+            </div>
+            <button class="btn btn-xs btn-primary" onclick={() => openRegion(r.id)}>Edit / Roll</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+</div>
+
+<RegionEditor bind:open={editorOpen} regionId={selectedId} />

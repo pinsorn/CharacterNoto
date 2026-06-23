@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Character Manager</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        .hero {
+            text-align: center;
+            padding: 2rem 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: -2rem -2rem 2rem -2rem;
+            border-radius: 0 0 10px 10px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #45a049;
+        }
+        .btn-secondary {
+            background: #2196F3;
+        }
+        .btn-secondary:hover {
+            background: #1976D2;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        .feature {
+            padding: 1rem;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid #eee;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>🎮 Character Manager</h1>
+        <p>A web-based character management system for RPGs, storytelling, and game development</p>
+        <a href="characterNoto.html" class="btn">Launch Character Manager</a>
+        <a href="https://github.com/your-username/character-manager" class="btn btn-secondary">View on GitHub</a>
+    </div>
+
+    <div class="features">
+        <div class="feature">
+            <h3>🎭 Character Management</h3>
+            <p>Create and manage characters with avatars, custom parameters, and detailed profiles</p>
+        </div>
+        <div class="feature">
+            <h3>🎒 Inventory System</h3>
+            <p>Track items, move them between characters, and manage quantities with ease</p>
+        </div>
+        <div class="feature">
+            <h3>🏆 Badge System</h3>
+            <p>Dynamic badges with JavaScript conditions that respond to character stats</p>
+        </div>
+        <div class="feature">
+            <h3>📱 Responsive Design</h3>
+            <p>Works perfectly on desktop and mobile with multiple view modes</p>
+        </div>
+        <div class="feature">
+            <h3>💾 Data Management</h3>
+            <p>Import/export functionality with automatic localStorage persistence</p>
+        </div>
+        <div class="feature">
+            <h3>🌍 Multilingual Support</h3>
+            <p>Built-in support for Thai and other non-English characters</p>
+        </div>
+    </div>
+
+    <h2>🚀 Quick Start</h2>
+    <ol>
+        <li><strong>Launch the app</strong> - Click the button above</li>
+        <li><strong>Add a character</strong> - Use "Add Character" or "Add Non-Character"</li>
+        <li><strong>Customize</strong> - Upload avatars, add custom parameters, manage inventory</li>
+        <li><strong>Create badges</strong> - Set up conditional badges based on character stats</li>
+        <li><strong>Export/Import</strong> - Save your data or share with others</li>
+    </ol>
+
+    <h2>🎯 Perfect For</h2>
+    <ul>
+        <li><strong>Tabletop RPGs</strong> - D&D, Pathfinder, Cyberpunk, and more</li>
+        <li><strong>Game Development</strong> - Character databases and NPC management</li>
+        <li><strong>Creative Writing</strong> - Character development and world-building</li>
+        <li><strong>Education</strong> - Literature analysis and character studies</li>
+    </ul>
+
+    <h2>✨ Features</h2>
+    <ul>
+        <li>🎭 Character creation with avatars and custom attributes</li>
+        <li>🎒 Comprehensive inventory management</li>
+        <li>🏆 Dynamic badge system with conditional logic</li>
+        <li>📱 Multiple view modes (Standard, Tile, Live)</li>
+        <li>💾 Import/Export functionality</li>
+        <li>🌙 Dark theme with modern UI</li>
+        <li>📱 Mobile-responsive design</li>
+        <li>🚀 Single-file, no-install solution</li>
+    </ul>
+
+    <footer>
+        <p>Made with ❤️ for character management enthusiasts</p>
+        <p><a href="https://github.com/your-username/character-manager">View Source Code</a> | 
+           <a href="https://github.com/your-username/character-manager/blob/main/README.md">Documentation</a> | 
+           <a href="https://github.com/your-username/character-manager/issues">Report Issues</a></p>
+    </footer>
+
+    <script>
+        // Update GitHub links when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // You can update this URL to match your actual GitHub repository
+            const repoUrl = 'https://github.com/your-username/character-manager';
+            
+            // Update all GitHub links
+            document.querySelectorAll('a[href*="your-username"]').forEach(link => {
+                if (link.getAttribute('href').includes('your-username')) {
+                    // Keep the relative path but update the username part
+                    // This would need to be customized for actual deployment
+                }
+            });
+        });
+    </script>
+</body>
+</html>

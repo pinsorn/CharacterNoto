@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Character Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@3.8.0/dist/full.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hide-buttons button,
+    .hide-buttons .btn,
+    .hide-buttons input[type="button"],
+    .hide-buttons input[type="submit"],
+    .hide-buttons .file-input {
+      display: none !important;
+    }
+    
+    /* Tab styling */
+    .tab-content.hidden {
+      display: none;
+    }
+    
+    .tabs {
+      border-bottom: 1px solid oklch(var(--b3));
+    }
+    
+    .effect-item {
+      background: oklch(var(--b2));
+    }
+  </style>
+  <style>
+    .tile-mode #character-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+      gap: 1rem;
+    }
+    .tile-mode #character-list .card {
+      max-width: none;
+    }
+    .tile-mode #character-list .card-body {
+      padding: 0.5rem;
+    }
+    .tile-mode #character-list .card-title {
+      font-size: 1rem;
+    }
+    .tile-mode .max-w-5xl {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .tile-mode #character-list {
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    }
+    .tile-mode #character-list .card {
+      min-width: 400px;
+    }
+  </style>
+  <!-- Load Noto Sans Thai for non-English characters -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai&display=swap" rel="stylesheet" />
+  <style>
+    /* Apply Noto Sans Thai as default font */
+    body { font-family: 'Noto Sans Thai', sans-serif; }
+  </style>
+</head>
+<body class="p-6">
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Character Manager</h1>
+    
+    <!-- Tab Navigation -->
+    <div class="tabs tabs-bordered mb-6">
+      <a class="tab tab-active" id="characters-tab" onclick="switchTab('characters')">Characters</a>
+      <a class="tab" id="items-tab" onclick="switchTab('items')">Items</a>
+      <a class="tab" id="crafting-tab" onclick="switchTab('crafting')">Crafting</a>
+    </div>
+    
+    <!-- Characters Tab Content -->
+    <div id="characters-content" class="tab-content">
+      <div class="sticky top-0 bg-base-200 z-50 w-full p-4 flex flex-wrap gap-4 mb-4">
+        <div class="flex items-center gap-4 w-full">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="toggle-params" class="toggle toggle-primary" />
+            Hide Parameters
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="toggle-buttons" class="toggle toggle-primary" />
+            Live Mode
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="toggle-tile" class="toggle toggle-primary" />
+            Tile Mode
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="toggle-items" class="toggle toggle-primary" />
+            Hide Items
+          </label>
+        </div>
+        <button class="btn btn-primary" onclick="exportData()">Export JSON</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('import-input').click()">Import JSON</button>
+        <input type="file" id="import-input" accept=".json" onchange="importData(event)" class="hidden" />
+        <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="handleAvatarSelected(event)" />
+        <label for="add-character-modal" class="btn btn-secondary">Add Character</label>
+        <label for="add-non-character-modal" class="btn btn-accent">Add Non-Character</label>
+        <label for="badge-modal" class="btn btn-info">Manage Badges</label>
+      </div>
+      <div id="character-list" class="grid gap-4"></div>
+      <!-- Floating character menu -->
+      <div id="character-menu" class="fixed right-0 top-1/2 transform -translate-y-1/2 flex flex-col flex-wrap max-h-screen gap-2 p-2 bg-base-200 shadow-lg z-50"></div>
+    </div>
+    
+    <!-- Items Tab Content -->
+    <div id="items-content" class="tab-content hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">Item Encyclopedia</h2>
+        <button class="btn btn-primary" onclick="addNewItemToDatabase()">Add New Item</button>
+      </div>
+      
+      <!-- Search Bar -->
+      <div class="mb-4">
+        <input type="text" id="item-search" class="input input-bordered w-full" 
+               placeholder="Search items by name, description, or how to obtain..." 
+               oninput="filterItems()" />
+      </div>
+      
+      <div id="item-database-list"></div>
+    </div>
+
+    <!-- Crafting Tab Content -->
+    <div id="crafting-content" class="tab-content hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">Crafting Recipes</h2>
+        <button class="btn btn-primary" onclick="addNewCraftingRecipe()">Add New Recipe</button>
+      </div>
+      
+      <!-- Search Bar -->
+      <div class="mb-4">
+        <input type="text" id="crafting-search" class="input input-bordered w-full" 
+               placeholder="Search recipes by name, materials, or output..." 
+               oninput="filterCraftingRecipes()" />
+      </div>
+      
+      <div id="crafting-recipes-list"></div>
+    </div>
+  </div>
+
+  <!-- Add Character Modal -->
+  <input type="checkbox" id="add-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Character</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="newCharacterName" class="input input-bordered" placeholder="Character name" />
+    </div>
+    <div class="modal-action">
+      <label for="add-character-modal" class="btn" onclick="submitNewCharacter()">Add</label>
+      <label for="add-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Add Non-Character Modal -->
+  <input type="checkbox" id="add-non-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Non-Character</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="newNonCharacterName" class="input input-bordered" placeholder="Name" />
+    </div>
+    <div class="modal-action">
+      <label for="add-non-character-modal" class="btn" onclick="submitNewNonCharacter()">Add</label>
+      <label for="add-non-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Edit Character Modal -->
+  <input type="checkbox" id="edit-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Edit Character Name</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="editCharacterName" class="input input-bordered" />
+    </div>
+    <div class="modal-action">
+      <label for="edit-character-modal" class="btn" onclick="confirmEditCharacter()">Save</label>
+      <label for="edit-character-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Add Item Modal -->
+  <input type="checkbox" id="add-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Add Item</h3>
+    <div class="form-control">
+      <label class="label">Item Name</label>
+      <input type="text" id="newItemName" list="item-suggestions" class="input input-bordered" placeholder="Item name" />
+      <datalist id="item-suggestions"></datalist>
+      <label class="label mt-2">Amount</label>
+      <input type="number" id="newItemAmount" class="input input-bordered" value="1" min="0" />
+    </div>
+    <div class="modal-action">
+      <label for="add-item-modal" class="btn" onclick="submitNewItem()">Add</label>
+      <label for="add-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Edit Item Modal -->
+  <input type="checkbox" id="edit-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box w-11/12 max-w-4xl">
+    <h3 class="font-bold text-lg mb-4">Edit Item</h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="form-control">
+        <label class="label">Item Name</label>
+        <input type="text" id="item-name" class="input input-bordered" placeholder="Item name" />
+      </div>
+      <div class="form-control">
+        <label class="label">How to Obtain</label>
+        <input type="text" id="item-obtain" class="input input-bordered" placeholder="How to get this item" />
+      </div>
+    </div>
+    
+    <div class="form-control mb-4">
+      <label class="label">Description</label>
+      <textarea id="item-description" class="textarea textarea-bordered" placeholder="Item description" rows="3"></textarea>
+    </div>
+    
+    <div class="mb-4">
+      <div class="flex justify-between items-center mb-2">
+        <label class="label">Effects when used</label>
+        <button type="button" class="btn btn-sm btn-accent" onclick="addEffectToForm()">Add Effect</button>
+      </div>
+      <div id="item-effects-list"></div>
+    </div>
+    
+    <div class="modal-action">
+      <label for="edit-item-modal" class="btn" onclick="saveItemFromForm()">Save Item</label>
+      <label for="edit-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Move Item Modal -->
+  <input type="checkbox" id="move-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Move Item</h3>
+    <div class="form-control">
+      <label class="label">Destination</label>
+      <select id="moveItemDestSelect" class="select select-bordered w-full"></select>
+    </div>
+    <div class="form-control mt-2">
+      <label class="label">Quantity</label>
+      <input type="number" id="moveItemQuantity" min="1" class="input input-bordered w-full" value="1" />
+    </div>
+    <div class="modal-action">
+      <label for="move-item-modal" class="btn" onclick="confirmMoveItem()">Move</label>
+      <label for="move-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Use Item Modal -->
+  <input type="checkbox" id="use-item-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg">Use Item</h3>
+    <p class="py-4">Use <strong id="use-item-name"></strong> on which character?</p>
+    <div class="form-control mb-4">
+      <label class="label">Select Character</label>
+      <select id="use-item-character-select" class="select select-bordered w-full"></select>
+    </div>
+    <div class="modal-action">
+      <label for="use-item-modal" class="btn btn-success" onclick="confirmUseItem()">Use Item</label>
+      <label for="use-item-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Custom Parameter Modal -->
+  <input type="checkbox" id="custom-param-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 id="custom-modal-title" class="font-bold text-lg">Add Custom Parameter</h3>
+    <div class="form-control">
+      <label class="label">Name</label>
+      <input type="text" id="customParamName" list="custom-suggestions" class="input input-bordered" placeholder="Parameter name" />
+      <datalist id="custom-suggestions"></datalist>
+      <label class="label mt-2">Type</label>
+      <select id="customParamType" class="select select-bordered">
+        <option value="range">Range</option>
+        <option value="checkbox">Checkbox</option>
+      </select>
+      <div id="param-range-settings" class="flex gap-2 mt-2">
+        <input type="number" id="customParamMin" class="input input-bordered" placeholder="Min" value="0" />
+        <input type="number" id="customParamMax" class="input input-bordered" placeholder="Max" value="100" />
+      </div>
+      <label class="label mt-2">Color</label>
+      <select id="customParamColor" class="select select-bordered">
+        <option>primary</option><option>secondary</option><option>accent</option>
+        <option>info</option><option>success</option><option>warning</option><option>error</option>
+      </select>
+    </div>
+    <div class="modal-action">
+      <label id="custom-add-btn" for="custom-param-modal" class="btn" onclick="submitCustomParam()">Add</label>
+      <label id="custom-save-btn" for="custom-param-modal" class="btn hidden" onclick="confirmEditCustom()">Save</label>
+      <label for="custom-param-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Badge Management Modal -->
+  <input type="checkbox" id="badge-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box w-3/4 max-w-lg">
+    <h3 class="font-bold text-lg">Manage Badges</h3>
+    <div id="badge-list" class="space-y-2 my-4 max-h-64 overflow-y-auto"></div>
+    <hr />
+    <div class="form-control mt-4">
+      <label class="label">Name</label>
+      <input type="text" id="badgeName" class="input input-bordered" placeholder="Badge name" />
+      <label class="label mt-2">Icon (emoji) use win+;</label>
+      <input type="text" id="badgeIcon" class="input input-bordered" placeholder="😀" maxlength="2" />
+      <label class="label mt-2">Color</label>
+      <select id="badgeColor" class="select select-bordered">
+        <option>primary</option><option>secondary</option><option>accent</option>
+        <option>info</option><option>success</option><option>warning</option><option>error</option>
+      </select>
+      <label class="label mt-2">Description</label>
+      <textarea id="badgeDesc" class="textarea textarea-bordered" placeholder="Description"></textarea>
+      <label class="label mt-2">Condition (JS expression, use hunger, thirsty, custom['key'].value (can be value, type[range,checkbox],min,max))</label>
+      <textarea id="badgeCond" class="textarea textarea-bordered" placeholder="e.g. hunger>50 && custom['Health']==true"></textarea>
+    </div>
+    <div class="modal-action">
+      <label id="badge-save-btn" for="badge-modal" class="btn" onclick="submitNewBadge()">Save Badge</label>
+      <label for="badge-modal" class="btn btn-ghost">Close</label>
+    </div>
+  </div></div>
+
+  <!-- Delete Character Confirmation Modal -->
+  <input type="checkbox" id="delete-character-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box">
+    <h3 class="font-bold text-lg text-red-500">Confirm Delete</h3>
+    <p class="py-4">Are you sure you want to delete <strong id="deleteCharName"></strong>?</p>
+    <div class="modal-action">
+      <label for="delete-character-modal" class="btn btn-error" onclick="confirmDeleteCharacter()">Yes, Delete</label>
+      <label for="delete-character-modal" class="btn">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Edit/Add Crafting Recipe Modal -->
+  <input type="checkbox" id="edit-crafting-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box max-w-4xl">
+    <h3 class="font-bold text-lg" id="crafting-modal-title">Add Crafting Recipe</h3>
+    
+    <div class="form-control mb-4">
+      <label class="label">Recipe Name</label>
+      <input type="text" id="crafting-name" class="input input-bordered" placeholder="Recipe name" />
+    </div>
+    
+    <div class="form-control mb-4">
+      <label class="label">Description</label>
+      <textarea id="crafting-description" class="textarea textarea-bordered" placeholder="Recipe description..." rows="3"></textarea>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+      <!-- Materials Section -->
+      <div>
+        <h4 class="font-bold mb-2">Materials Required</h4>
+        <div id="crafting-materials-list" class="space-y-2 mb-3"></div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addMaterialToForm()">Add Material</button>
+      </div>
+      
+      <!-- Output Section -->
+      <div>
+        <h4 class="font-bold mb-2">Output Items</h4>
+        <div id="crafting-outputs-list" class="space-y-2 mb-3"></div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="addOutputToForm()">Add Output</button>
+      </div>
+    </div>
+    
+    <div class="modal-action">
+      <button class="btn btn-primary" onclick="saveCraftingRecipeFromForm()">Save Recipe</button>
+      <label for="edit-crafting-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Character Crafting Modal -->
+  <input type="checkbox" id="character-crafting-modal" class="modal-toggle" />
+  <div class="modal"><div class="modal-box max-w-2xl">
+    <h3 class="font-bold text-lg">Crafting - <span id="crafting-character-name"></span></h3>
+    
+    <div class="form-control mb-4">
+      <label class="label">Select Recipe</label>
+      <select id="character-crafting-recipe-select" class="select select-bordered w-full" onchange="updateCraftingPreview()">
+        <option value="">Choose a recipe...</option>
+      </select>
+    </div>
+    
+    <div class="form-control mb-4">
+      <label class="label">Quantity to Craft</label>
+      <div class="flex gap-2">
+        <input type="number" id="crafting-quantity" class="input input-bordered flex-1" 
+               min="1" max="999" value="1" onchange="updateCraftingPreview()" 
+               placeholder="How many times to craft this recipe" />
+        <button type="button" id="max-quantity-btn" class="btn btn-outline btn-sm" 
+                onclick="setMaxCraftingQuantity()" disabled>Max</button>
+      </div>
+    </div>
+    
+    <div id="crafting-preview" class="hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <h4 class="font-bold text-sm mb-2">Required Materials</h4>
+          <div id="crafting-materials-preview" class="space-y-1"></div>
+        </div>
+        <div>
+          <h4 class="font-bold text-sm mb-2">Output</h4>
+          <div id="crafting-outputs-preview" class="space-y-1"></div>
+        </div>
+      </div>
+      
+      <div id="crafting-status" class="mb-4"></div>
+    </div>
+    
+    <div class="modal-action">
+      <button id="craft-button" class="btn btn-primary" onclick="confirmCrafting()" disabled>Craft</button>
+      <label for="character-crafting-modal" class="btn btn-ghost">Cancel</label>
+    </div>
+  </div></div>
+
+  <!-- Toast -->
+  <div id="save-toast" class="toast toast-end fixed bottom-4 right-4 transition-opacity opacity-0 pointer-events-none">
+    <div class="alert alert-success"><span>✅ Saved!</span></div>
+  </div>
+
+  <!-- Summary -->
+  <div id="summary" class="max-w-5xl mx-auto mt-6 p-4 bg-base-200 rounded-lg">
+    <h2 class="text-xl font-bold mb-2">📊 Summary</h2>
+    <ul id="summary-list" class="list-disc list-inside space-y-1 text-sm"></ul>
+    <div id="item-summary" class="mt-4"></div>
+  </div>
+
+  <!-- Hidden datalist for boolean values -->
+  <datalist id="boolean-options">
+    <option value="true">true</option>
+    <option value="false">false</option>
+  </datalist>
+
+  <!-- Load external JavaScript -->
+  <script src="character-manager.js"></script>
+  <script src="item-manager.js"></script>
+  <script src="crafting-manager.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+
+</body>
+</html>

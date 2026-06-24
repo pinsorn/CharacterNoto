@@ -1,179 +1,55 @@
-﻿# Character Manager
-*This web application was created with the assistance of AI technology*
+# Character Manager (CharacterNoto)
 
-A comprehensive web-based character management system built with HTML, CSS (TailwindCSS + DaisyUI), and vanilla JavaScript. Perfect for tabletop RPGs, storytelling, game development, or any scenario where you need to track multiple characters with custom attributes, inventories, items, and crafting systems.
+A browser-based manager for tabletop RPGs / storytelling / game prototyping: characters, items, crafting, a region-loot **map**, a multi-axis **relationship graph**, real **3D dice**, and live **read-only sharing** from a DM to players over peer-to-peer.
+
+Runs entirely in your browser — data stays local (localStorage + IndexedDB). Originally a single-file vanilla app; **v3.x** is a rewrite on **Svelte 5 + Vite**. The legacy single-file version is kept under [`legacy/`](legacy/).
 
 ![Character Manager Preview](preview.png)
 
-##  Features
+## Features
 
-### Core Character Management
-- **Character Management**: Create, edit, and delete characters or non-character entities
-- **Multilingual Support**: Built-in support for Thai and other non-English characters using Noto Sans Thai font
-- **Avatar System**: Upload and manage character avatars with automatic compression
-- **Custom Parameters**: Create custom attributes with range sliders or checkboxes
-- **Badge System**: Dynamic badges with conditional logic based on character stats
-- **Data Persistence**: Automatic saving to browser localStorage
-- **Import/Export**: JSON-based data backup and sharing
+- **Characters** — create characters / non-characters, hunger & thirsty stats, custom range/checkbox parameters, avatars (stored in IndexedDB), inventories (add/move/use), and **badges** with conditional logic. Tile mode, hide-params/items toggles, drag-reorder.
+- **Items** — an item encyclopedia with an **effects engine** (add/subtract/set on stats or custom params); use an item on a character; search.
+- **Crafting** — recipes (materials → outputs), live preview, max-craftable, craft straight from a character card.
+- **Map** — upload a background image, draw freeform **polygon regions**, edit/reshape them, and stock each region with a **loot table** (per-item drop %, per-roll quantity, depleting stock or infinite). **Roll** independent or weighted; send loot to a character's inventory.
+- **Relationships** — a character graph with **DM-defined axes** (e.g. Trust/Fear/Respect, each its own min/max). Rate each directed relationship and view it as an SVG **radar/spider chart** (with the reverse edge overlaid); highlight graph edges by an axis.
+- **Dice** — a **3D dice** builder (Three.js + cannon-es): any number of dice, any number of faces, custom label per face, dice can differ; physics tumble then reveals a fair result. Plus a classic notation roller (`2d6+3`).
+- **Sharing (DM → players)** — go live and share a **read-only** view with players over **WebRTC P2P** (PeerJS) — no server, no account. Pick which tabs to share; hidden entities/unshared tabs are filtered out at the source. See [Sharing](#sharing-dm--players).
+- **Themes** — 10 DaisyUI themes; **zip backup** (export/import incl. images).
 
-###  Advanced Inventory & Item System
-- **Item Encyclopedia**: Comprehensive database of items with descriptions, effects, and how-to-obtain information
-- **Item Effects System**: Define complex item effects that modify character stats or custom parameters
-- **Use Item Functionality**: Apply item effects to characters with automatic parameter creation
-- **Inventory Management**: Add, edit, move, and track items with quantities between characters
-- **Smart Item Suggestions**: Auto-complete based on existing item database
-- **Item Search**: Filter items by name, description, effects, or how to obtain
+## Run
 
-###  Crafting System
-- **Recipe Management**: Create and manage crafting recipes with materials and outputs
-- **Bulk Crafting**: Craft multiple quantities at once with intelligent material validation
-- **Material Validation**: Real-time checking of available materials vs. required materials
-- **Crafting Preview**: See exactly what materials you need and what you'll receive
-- **Max Quantity Calculation**: Automatically determine the maximum craftable amount
-- **Recipe Search**: Filter recipes by name, materials, or outputs
+Requires Node 18+.
 
-### User Interface Features
-- **Multiple View Modes**:
-  - Standard card view
-  - Tile mode for compact display
-  - Live mode for real-time updates
-- **Three-Tab Interface**:
-  - Characters tab for character management
-  - Items tab for item encyclopedia
-  - Crafting tab for recipe management
-- **Toggle Controls**:
-  - Hide/show parameters
-  - Hide/show items
-  - Hide/show buttons (Live Mode)
-- **Drag & Drop**: Reorder characters with intuitive drag-and-drop
-- **Responsive Design**: Works on desktop and mobile devices
-- **Dark Theme**: Modern dark theme with DaisyUI components
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # static build → dist/ (host anywhere, e.g. GitHub Pages)
+npm run preview  # preview the build
+```
 
-### Advanced Features
-- **Smart Suggestions**: Auto-complete for items and parameters based on existing data
-- **Statistics Summary**: Real-time summary of characters, items, and parameters
-- **Character Navigation**: Floating menu for quick character navigation
-- **Real-time Updates**: Live mode with automatic data synchronization
-- **Modular Architecture**: Separate managers for characters, items, and crafting
-- **Enhanced Modal Management**: Reliable modal closing and state management
+There is no backend — `dist/` is fully static.
 
-##  Getting Started
+## Sharing (DM → players)
 
-### Prerequisites
-- Modern web browser with JavaScript enabled
-- No server setup required - runs entirely in the browser
+1. The host (DM) clicks **Share → Go Live**. A **room code** and a **viewer link** (`?view=1&room=…`) are generated.
+2. Players open the link (or open `?view=1` and type the room code) → they connect **directly** to the DM over WebRTC and watch **read-only**, live.
+3. The DM toggles which tabs are shared; changes re-broadcast instantly. Only shared tabs (minus any entity flagged hidden) are ever sent.
 
-### Installation
-1. Download the characterNoto.html file and accompanying JavaScript files:
-   - character-manager.js
-   - item-manager.js
-   - crafting-manager.js
-2. Keep all files in the same directory
-3. Open characterNoto.html in your web browser
-4. Start creating characters!
+How it finds the host: the room code **is** the DM's PeerJS peer id. A free public **broker** (PeerJS) only brokers the handshake — game data flows browser-to-browser, never through it. Uses public STUN (no TURN), so it works on typical home/mobile networks; strict/corporate NAT may block P2P. The DM must stay online for players to connect.
 
-### Quick Start
-1. **Add Your First Character**:
-   - Click "Add Character" to create a character with default hunger/thirsty stats
-   - Or click "Add Non-Character" for entities without default stats
+## Data & privacy
 
-2. **Set Up Your Item Encyclopedia**:
-   - Switch to the "Items" tab
-   - Click "Add New Item" to create items with effects
-   - Define how items affect character stats
+- All data is local: JSON in **localStorage**, images (avatars, map backgrounds) as Blobs in **IndexedDB**.
+- No server, no analytics. Sharing is peer-to-peer; players receive only what the DM shares.
+- Full-fidelity **zip backup** bundles a JSON manifest + images.
 
-3. **Create Crafting Recipes**:
-   - Switch to the "Crafting" tab
-   - Click "Add New Recipe" to create crafting recipes
-   - Define required materials and output items
+## Tech
 
-4. **Use the System**:
-   - Use items on characters from the Items tab
-   - Craft items from character cards using the "Craft" button
-   - Manage inventories and track resources
+Svelte 5 · Vite · Tailwind CSS 3 + DaisyUI 4 · Three.js + cannon-es (3D dice) · PeerJS (P2P sharing) · JSZip (backup) · Noto Sans Thai.
 
-##  Key Features Summary
+Pure logic has node self-checks: `node src/lib/<name>.test.mjs` (effects/crafting, loot, dice, dice-set, public-view).
 
-###  Major Update - All Features Implemented
-- [x] **Character Management**: Full CRUD operations with custom parameters
-- [x] **Avatar System**: Image upload with automatic compression
-- [x] **Badge System**: Conditional badges with JavaScript expressions
-- [x] **Import/Export**: Complete data backup and sharing
-- [x] **Item Encyclopedia**: Comprehensive item database with effects
-- [x] **Item Effects System**: Complex stat and parameter modifications
-- [x] **Use Item Functionality**: Apply items to characters with auto-parameter creation
-- [x] **Crafting System**: Complete recipe management with materials and outputs
-- [x] **Bulk Crafting**: Craft multiple quantities with material validation
-- [x] **Smart Suggestions**: Auto-complete for all item and parameter inputs
-- [x] **Search Functionality**: Filter items and recipes by multiple criteria
-- [x] **Modular Architecture**: Separate managers for different functionalities
-- [x] **Enhanced UI**: Three-tab interface with responsive design
-- [x] **Real-time Validation**: Material checking and crafting previews
-- [x] **Mobile Optimization**: Touch-friendly responsive interface
-- [x] **Data Integrity**: Validation and duplicate prevention
-- [x] **Live Mode**: Real-time updates for display scenarios
+## License
 
-##  Technical Details
-
-### Technologies Used
-- **HTML5**: Semantic markup with modern standards
-- **CSS**: Custom styles with responsive design
-- **TailwindCSS**: Utility-first CSS framework
-- **DaisyUI**: Component library for consistent UI
-- **Vanilla JavaScript**: No external JavaScript dependencies
-- **SortableJS**: Drag-and-drop functionality (CDN)
-- **Google Fonts**: Noto Sans Thai for multilingual support
-
-### Architecture
-- **Modular Design**: Separate managers for different functionality
-  - character-manager.js: Core character management
-  - item-manager.js: Item encyclopedia and effects system
-  - crafting-manager.js: Recipe and crafting system
-- **Event-Driven**: Efficient update propagation between modules
-- **State Management**: Centralized localStorage handling
-- **Initialization Protection**: Prevents duplicate manager initialization
-
-##  Use Cases
-
-### Tabletop RPGs
-- Track player characters and NPCs
-- Manage complex inventories with item effects
-- Create crafting systems for campaigns
-- Monitor health, mana, or custom stats
-- Track item usage and effects
-
-### Game Development
-- Character database for testing
-- Item and crafting system prototyping
-- Balance testing for resources and recipes
-- NPC management during development
-- Character progression visualization
-
-### Storytelling
-- Character development tracking
-- Item significance and effects
-- Resource management in stories
-- World-building entity organization
-- Plot device inventory
-
-##  Privacy & Security
-
-- **Local Storage Only**: All data stays in your browser
-- **No Server Communication**: Completely offline after initial load
-- **No Analytics**: No tracking or data collection
-- **Secure by Design**: No external data transmission
-- **AI-Generated**: Created with AI assistance for enhanced functionality
-
-##  License
-
-This project is open source and available under the MIT License.
-
-##  Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
-
----
-
-**Created with  and AI assistance for character management enthusiasts**
-
-*This application leverages AI technology to provide a comprehensive, user-friendly character management experience with advanced inventory, crafting, and item systems.*
+MIT.

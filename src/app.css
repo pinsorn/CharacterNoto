@@ -6,6 +6,14 @@ body {
   font-family: 'Noto Sans Thai', sans-serif;
 }
 
+/* Viewer (read-only) mode: the shared content is wrapped in [inert]. Hide action buttons
+   and the add-item/file controls so players see a clean read-only view (values, sliders,
+   cards, and the 3D dice still render). */
+[inert] .btn,
+[inert] input[type='file'] {
+  display: none !important;
+}
+
 /* Tile mode — ported from legacy characterNoto.html */
 .tile-mode #character-list {
   display: grid;

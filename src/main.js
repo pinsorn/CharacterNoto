@@ -2,9 +2,13 @@ import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 import { initData, migrateAvatars } from './lib/init.js';
+import { viewer } from './lib/mode.js';
 
-initData();
-migrateAvatars(); // async, fire-and-forget; reflects when done
+if (!viewer) {
+  // Host only: seed/normalise/migrate local data. Viewers start empty and fill over P2P.
+  initData();
+  migrateAvatars();
+}
 const app = mount(App, { target: document.getElementById('app') });
 
 export default app;

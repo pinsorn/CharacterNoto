@@ -3,6 +3,15 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-06-24
+
+### Added — DM → Player live sharing (serverless, P2P)
+- A **"Share"** panel lets the host (DM) go live and get a **viewer link / room code**. Players open it and view the session **read-only**, live. Direct **WebRTC P2P** (PeerJS) — game data flows browser-to-browser, no server, no account; the broker only brokers the handshake.
+- **Per-tab visibility**: the host chooses which tabs to share; toggling re-broadcasts instantly. Visibility is enforced at the source — the host sends a **filtered public view** (only shared tabs, minus any entity flagged `hidden`), so players never receive hidden data. `buildPublicView` is pure + tested.
+- **Many players** at once (star broadcast); the panel shows the connected count.
+- **Viewer mode** (`?view=1&room=…`): in-memory only (never touches the player's own localStorage), all editing controls hidden/`inert`, only shared tabs shown. Shared images (avatars, map background) stream over the data channel.
+- ⚠️ Uses public STUN; no TURN — works on typical home/mobile networks, may fail on strict/corporate NAT (a manual-paste fallback can be added later).
+
 ## [3.4.0] - 2026-06-24
 
 ### Added — 3D Dice

@@ -1,6 +1,6 @@
 {
   "name": "characternoto",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "description": "Character / item / crafting / map manager — Svelte app",
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
   "dependencies": {
     "cannon-es": "^0.20.0",
     "jszip": "^3.10.1",
+    "peerjs": "^1.5.5",
     "three": "^0.184.0"
   }
 }

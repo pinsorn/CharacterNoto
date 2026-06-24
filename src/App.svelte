@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import Characters from './components/Characters.svelte';
   import Items from './components/Items.svelte';
   import Crafting from './components/Crafting.svelte';
@@ -8,11 +9,13 @@
   import Toast from './components/Toast.svelte';
   import UseItemModal from './components/UseItemModal.svelte';
   import CraftingModal from './components/CraftingModal.svelte';
+  import SharePanel from './components/SharePanel.svelte';
   import { characters, itemDatabase, craftingRecipes } from './lib/stores.js';
   import { exportZip, importZip } from './lib/backup.js';
+  import { viewer } from './lib/mode.js';
+  import { p2pStatus, receivedShare, playerJoin } from './lib/p2p.js';
 
-  let tab = $state('characters');
-  const tabs = [
+  const allTabs = [
     { id: 'characters', label: 'Characters' },
     { id: 'items', label: 'Items' },
     { id: 'crafting', label: 'Crafting' },
@@ -20,33 +23,39 @@
     { id: 'relationships', label: 'Relationships' },
     { id: 'dice', label: 'Dice' },
   ];
+  // Viewers only see tabs the host shared.
+  const tabs = $derived(viewer ? allTabs.filter((t) => $receivedShare?.[t.id]) : allTabs);
+
+  let tab = $state('characters');
+  $effect(() => {
+    if (tabs.length && !tabs.some((t) => t.id === tab)) tab = tabs[0].id;
+  });
 
   // Theme: persisted, applied to <html data-theme>.
   const THEMES = ['dark', 'light', 'dracula', 'synthwave', 'forest', 'business', 'night', 'cyberpunk', 'luxury', 'coffee'];
   let theme = $state(localStorage.getItem('theme') || 'dark');
   $effect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('theme', theme);
-    } catch {
-      /* ignore */
-    }
+    try { localStorage.setItem('theme', theme); } catch { /* ignore */ }
   });
 
+  // --- host: backup + share ---
   let backupInput;
+  let shareOpen = $state(false);
   async function onBackupSelected(e) {
     const file = e.target.files?.[0];
     e.target.value = null;
     if (!file) return;
-    try {
-      await importZip(file);
-    } catch (err) {
-      alert('Import failed: ' + err.message);
-    }
+    try { await importZip(file); } catch (err) { alert('Import failed: ' + err.message); }
   }
 
-  // All tabs stay mounted (toggled via .hidden) so state persists and the cross-tab
-  // craftingFor / useItemFor modals react regardless of which tab is active.
+  // --- viewer: join a host ---
+  const roomParam = new URLSearchParams(location.search).get('room');
+  let joinCode = $state(roomParam || '');
+  onMount(() => {
+    if (viewer && roomParam) playerJoin(roomParam);
+  });
+
   const totalItems = $derived($characters.reduce((s, c) => s + (c.items?.length || 0), 0));
 </script>
 
@@ -56,31 +65,58 @@
     <select class="select select-xs select-bordered" bind:value={theme} title="Theme">
       {#each THEMES as t}<option value={t}>{t}</option>{/each}
     </select>
-    <button class="btn btn-xs btn-outline" onclick={exportZip}>Export Backup (.zip)</button>
-    <button class="btn btn-xs btn-outline" onclick={() => backupInput.click()}>Import Backup</button>
-    <input type="file" accept=".zip" class="hidden" bind:this={backupInput} onchange={onBackupSelected} />
-  </div>
-  <div class="text-sm opacity-70 mb-4">
-    {$characters.length} characters · {totalItems} inventory items ·
-    {$itemDatabase.length} wiki items · {$craftingRecipes.length} recipes
-  </div>
-
-  <div role="tablist" class="tabs tabs-bordered mb-6">
-    {#each tabs as t}
-      <button role="tab" class="tab" class:tab-active={tab === t.id} onclick={() => (tab = t.id)}>
-        {t.label}
-      </button>
-    {/each}
+    {#if !viewer}
+      <button class="btn btn-xs btn-primary" onclick={() => (shareOpen = true)}>Share</button>
+      <button class="btn btn-xs btn-outline" onclick={exportZip}>Export Backup (.zip)</button>
+      <button class="btn btn-xs btn-outline" onclick={() => backupInput.click()}>Import Backup</button>
+      <input type="file" accept=".zip" class="hidden" bind:this={backupInput} onchange={onBackupSelected} />
+    {/if}
   </div>
 
-  <div class:hidden={tab !== 'characters'}><Characters /></div>
-  <div class:hidden={tab !== 'items'}><Items /></div>
-  <div class:hidden={tab !== 'crafting'}><Crafting /></div>
-  <div class:hidden={tab !== 'map'}><MapTab /></div>
-  <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
-  <div class:hidden={tab !== 'dice'}><DiceTab /></div>
+  {#if viewer}
+    <!-- Viewer status / join -->
+    <div class="flex flex-wrap items-center gap-2 mb-4 text-sm">
+      {#if $p2pStatus.connected}
+        <span class="badge badge-success">● Live</span> viewing the DM (read-only)
+      {:else if $p2pStatus.role === 'player'}
+        <span class="badge badge-warning">connecting…</span>
+        {#if $p2pStatus.error}<span class="opacity-70">({$p2pStatus.error})</span>{/if}
+      {:else}
+        <input class="input input-sm input-bordered" placeholder="room code" bind:value={joinCode} />
+        <button class="btn btn-sm btn-primary" onclick={() => joinCode && playerJoin(joinCode)} disabled={!joinCode}>Join</button>
+      {/if}
+    </div>
+  {:else}
+    <div class="text-sm opacity-70 mb-4">
+      {$characters.length} characters · {totalItems} inventory items ·
+      {$itemDatabase.length} wiki items · {$craftingRecipes.length} recipes
+    </div>
+  {/if}
+
+  {#if tabs.length}
+    <div role="tablist" class="tabs tabs-bordered mb-6">
+      {#each tabs as t}
+        <button role="tab" class="tab" class:tab-active={tab === t.id} onclick={() => (tab = t.id)}>{t.label}</button>
+      {/each}
+    </div>
+  {:else if viewer}
+    <div class="text-center opacity-60 py-10">Waiting for the DM to share…</div>
+  {/if}
+
+  <!-- Viewer content is read-only via `inert` (non-interactive); the tablist stays clickable. -->
+  <div inert={viewer || undefined}>
+    <div class:hidden={tab !== 'characters'}><Characters /></div>
+    <div class:hidden={tab !== 'items'}><Items /></div>
+    <div class:hidden={tab !== 'crafting'}><Crafting /></div>
+    <div class:hidden={tab !== 'map'}><MapTab /></div>
+    <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
+    <div class:hidden={tab !== 'dice'}><DiceTab /></div>
+  </div>
 </div>
 
 <Toast />
-<UseItemModal />
-<CraftingModal />
+{#if !viewer}
+  <UseItemModal />
+  <CraftingModal />
+  <SharePanel bind:open={shareOpen} />
+{/if}

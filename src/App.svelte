@@ -21,6 +21,18 @@
     { id: 'dice', label: 'Dice' },
   ];
 
+  // Theme: persisted, applied to <html data-theme>.
+  const THEMES = ['dark', 'light', 'dracula', 'synthwave', 'forest', 'business', 'night', 'cyberpunk', 'luxury', 'coffee'];
+  let theme = $state(localStorage.getItem('theme') || 'dark');
+  $effect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch {
+      /* ignore */
+    }
+  });
+
   let backupInput;
   async function onBackupSelected(e) {
     const file = e.target.files?.[0];
@@ -41,6 +53,9 @@
 <div class="max-w-5xl mx-auto p-4">
   <div class="flex flex-wrap items-center gap-2 mb-1">
     <h1 class="text-2xl font-bold mr-auto">Character Manager</h1>
+    <select class="select select-xs select-bordered" bind:value={theme} title="Theme">
+      {#each THEMES as t}<option value={t}>{t}</option>{/each}
+    </select>
     <button class="btn btn-xs btn-outline" onclick={exportZip}>Export Backup (.zip)</button>
     <button class="btn btn-xs btn-outline" onclick={() => backupInput.click()}>Import Backup</button>
     <input type="file" accept=".zip" class="hidden" bind:this={backupInput} onchange={onBackupSelected} />

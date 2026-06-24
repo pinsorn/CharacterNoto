@@ -7,7 +7,7 @@ export default {
   plugins: [daisyui],
   // Match the legacy app: data-theme="dark".
   daisyui: {
-    themes: ['light', 'dark'],
+    themes: ['dark', 'light', 'dracula', 'synthwave', 'forest', 'business', 'night', 'cyberpunk', 'luxury', 'coffee'],
     darkTheme: 'dark',
     logs: false,
   },

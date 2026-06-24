@@ -3,6 +3,12 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-06-24
+
+### Added (polish)
+- **Theme switcher** — a header dropdown across 10 DaisyUI themes (dark, light, dracula, synthwave, forest, business, night, cyberpunk, luxury, coffee); the choice persists to `localStorage` and applies to `<html data-theme>`.
+- **Highlight relationship edges by axis** — in the graph, a "Highlight edges by" dropdown colours and thickens each edge by its value on the chosen axis (low → high ramp, thicker = higher), turning the web into a quick heat-map for one dimension.
+
 ## [3.2.0] - 2026-06-24
 
 ### Added

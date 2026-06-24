@@ -69,16 +69,39 @@
     });
   }
 
-  // Edges that still connect existing characters, resolved to coordinates.
+  // --- highlight edges by an axis -----------------------------------------
+  let highlightAxisId = $state('');
+  const clamp01 = (n) => Math.min(1, Math.max(0, n));
+  const LO = '#475569', HI = '#f87272'; // edge colour ramp low→high
+  function lerpHex(a, b, t) {
+    const ch = (s, i) => parseInt(s.slice(i, i + 2), 16);
+    const mix = (i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0');
+    return '#' + mix(1) + mix(3) + mix(5);
+  }
+
+  // Edges that still connect existing characters, resolved to coordinates (+ highlight styling).
   const drawnEdges = $derived.by(() => {
     const n = $characters.length;
     const idx = new Map($characters.map((c, i) => [c.id, i]));
+    const ax = $relationships.axes.find((a) => a.id === highlightAxisId);
     return $relationships.edges
       .filter((e) => byId.has(e.from) && byId.has(e.to))
       .map((e) => {
         const a = posOf(byId.get(e.from), idx.get(e.from), n);
         const b = posOf(byId.get(e.to), idx.get(e.to), n);
-        return { ...e, a, b, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+        let hl = null;
+        if (ax) {
+          const v = e.values?.[ax.id];
+          hl = v === undefined || ax.max === ax.min ? 0 : clamp01((v - ax.min) / (ax.max - ax.min));
+        }
+        return {
+          ...e,
+          a,
+          b,
+          mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+          stroke: hl === null ? '#94a3b8' : lerpHex(LO, HI, hl),
+          width: hl === null ? 1.5 : 1.5 + 3.5 * hl,
+        };
       });
   });
 
@@ -191,6 +214,20 @@
     {/if}
   </div>
 
+  <!-- Highlight edges by axis -->
+  {#if $relationships.axes.length}
+    <div class="flex items-center gap-2 mb-2 text-sm flex-wrap">
+      <span>Highlight edges by:</span>
+      <select class="select select-xs select-bordered" bind:value={highlightAxisId}>
+        <option value="">None</option>
+        {#each $relationships.axes as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
+      </select>
+      {#if highlightAxisId}
+        <span class="text-xs opacity-70">low <span style="color:#475569">▬</span>→<span style="color:#f87272">▬</span> high (thicker = higher)</span>
+      {/if}
+    </div>
+  {/if}
+
   <!-- Graph canvas (square so circles stay round) -->
   <div class="relative w-full bg-base-300 rounded overflow-hidden mx-auto" style="aspect-ratio: 1/1; max-width: 600px;">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -213,7 +250,7 @@
       {#each drawnEdges as e (e.id)}
         <line
           x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y}
-          stroke="#94a3b8" stroke-width="1.5" vector-effect="non-scaling-stroke"
+          stroke={e.stroke} stroke-width={e.width} vector-effect="non-scaling-stroke"
           marker-end="url(#arrow)"
         />
         {#if e.label}

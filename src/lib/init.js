@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { characters, itemDatabase } from './stores.js';
+import { characters, itemDatabase, relationships } from './stores.js';
 import { validateItemDatabase, addMissingItemsFromInventories, seedCharacters } from './normalize.js';
 import { putBlob, newImageId } from './blobstore.js';
 
@@ -22,6 +22,15 @@ export function initData() {
   let db = validateItemDatabase(get(itemDatabase));
   db = addMissingItemsFromInventories(db, get(characters));
   itemDatabase.set(db);
+
+  // Relationship store shape (axes added in v3.2; every edge gets a values map).
+  relationships.update((rel) => {
+    if (!Array.isArray(rel.axes)) rel.axes = [];
+    if (!Array.isArray(rel.edges)) rel.edges = [];
+    if (!rel.positions) rel.positions = {};
+    for (const e of rel.edges) if (!e.values) e.values = {};
+    return rel;
+  });
 }
 
 // One-time migration: move legacy base64 `avatar` data URLs into IndexedDB, replacing them

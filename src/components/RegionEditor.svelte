@@ -54,6 +54,7 @@
 
   // --- roll ---------------------------------------------------------------
   let randomizeQty = $state(true);
+  let mode = $state('independent'); // 'independent' | 'weighted' — DM picks per roll
   let results = $state(null); // null = not rolled yet; [] = nothing dropped
   let sendTo = $state(0);
 
@@ -61,7 +62,7 @@
     let loot = [];
     mapData.update((d) => {
       const r = d.regions.find((x) => x.id === regionId);
-      if (r) loot = rollRegion(r, { randomizeQty }); // mutates stock for finite items
+      if (r) loot = rollRegion(r, { randomizeQty, mode }); // mutates stock for finite items
       return d;
     });
     results = loot;
@@ -141,13 +142,22 @@
 
     <!-- Roll panel -->
     <div class="border-t border-base-300 pt-3">
-      <div class="flex items-center gap-3 mb-3 flex-wrap">
+      <div class="flex items-center gap-3 mb-1 flex-wrap">
+        <div class="join">
+          <button class="btn btn-xs join-item {mode === 'independent' ? 'btn-primary' : 'btn-outline'}"
+            onclick={() => (mode = 'independent')}>Independent</button>
+          <button class="btn btn-xs join-item {mode === 'weighted' ? 'btn-primary' : 'btn-outline'}"
+            onclick={() => (mode = 'weighted')}>Weighted (pick 1)</button>
+        </div>
         <label class="flex items-center gap-2 text-sm">
           <input type="checkbox" class="toggle toggle-sm toggle-primary" bind:checked={randomizeQty} />
           Randomize quantity
         </label>
         <button class="btn btn-sm btn-primary" onclick={roll} disabled={region.items.length === 0}>Roll</button>
       </div>
+      {#if mode === 'weighted'}
+        <p class="text-xs opacity-60 mb-2">Drop% is used as a relative weight; one item drops per roll.</p>
+      {/if}
 
       {#if results !== null}
         {#if results.length === 0}

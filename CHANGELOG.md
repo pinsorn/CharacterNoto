@@ -3,6 +3,18 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-06-24
+
+### Added
+- **Weighted roll mode** for region loot — the DM picks **Independent** (each item rolls its own %, 0..N drops) or **Weighted** (exactly one item, `Drop%` used as a relative weight) per roll. Weighted respects and depletes finite stock.
+- **Multi-axis relationships + spider/radar chart** — the DM defines global **axes** (e.g. Trust, Fear, Respect) each with its own min/max (signed ranges allowed). Each directed relationship rates every axis via sliders and is plotted as an SVG **radar chart**, overlaying the reverse edge (B→A, dashed) for asymmetry. New `RadarChart.svelte`.
+
+### Changed
+- `relationships` store gains a global `axes` array; edges gain a per-axis `values` map (auto-migrated on load). Zip backup already carries it.
+
+### Tests
+- `loot.test.mjs` now covers weighted pick + depletion (9). Suites: logic (15) + loot (9) + dice (7).
+
 ## [3.1.0] - 2026-06-24
 
 ### Added

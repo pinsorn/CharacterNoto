@@ -2,6 +2,8 @@
   // Character relationship graph. Nodes = characters (by id), edges = directed labelled
   // relationships. Nodes are draggable; positions persist. Square canvas so circles stay round.
   import { characters, relationships } from '../lib/stores.js';
+  import Modal from './Modal.svelte';
+  import RadarChart from './RadarChart.svelte';
 
   const COLORS = ['#7c3aed', '#db2777', '#06b6d4', '#36d399', '#fbbd23', '#f87272', '#3abff8'];
 
@@ -79,6 +81,70 @@
         return { ...e, a, b, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
       });
   });
+
+  // --- axes (global, DM-defined) -----------------------------------------
+  function addAxis() {
+    relationships.update((r) => {
+      r.axes = [...(r.axes ?? []), { id: crypto.randomUUID(), name: 'New axis', min: 0, max: 10 }];
+      return r;
+    });
+  }
+  function setAxis(id, key, value) {
+    relationships.update((r) => {
+      const a = r.axes.find((x) => x.id === id);
+      if (a) a[key] = key === 'name' ? value : parseInt(value, 10) || 0;
+      return r;
+    });
+  }
+  function removeAxis(id) {
+    relationships.update((r) => {
+      r.axes = r.axes.filter((a) => a.id !== id);
+      return r;
+    });
+  }
+
+  // --- edge editor (per-axis values + radar) ------------------------------
+  let editingId = $state(null);
+  let editorOpen = $state(false);
+  // Fresh copy each store fire so sliders + radar stay reactive under in-place edits.
+  const editingEdge = $derived.by(() => {
+    const e = $relationships.edges.find((x) => x.id === editingId);
+    return e ? { ...e, values: { ...(e.values ?? {}) } } : null;
+  });
+  const reverseEdge = $derived.by(() => {
+    const e = editingEdge;
+    return e ? ($relationships.edges.find((x) => x.from === e.to && x.to === e.from) ?? null) : null;
+  });
+  const radarSeries = $derived.by(() => {
+    const e = editingEdge;
+    if (!e) return [];
+    const s = [{ label: `${byId.get(e.from)?.name}→${byId.get(e.to)?.name}`, color: '#7c3aed', values: e.values }];
+    const rev = reverseEdge;
+    if (rev) s.push({ label: `${byId.get(rev.from)?.name}→${byId.get(rev.to)?.name}`, color: '#36d399', dashed: true, values: rev.values ?? {} });
+    return s;
+  });
+
+  function openEdgeEditor(id) {
+    editingId = id;
+    editorOpen = true;
+  }
+  function setEdgeLabel(v) {
+    relationships.update((r) => {
+      const e = r.edges.find((x) => x.id === editingId);
+      if (e) e.label = v;
+      return r;
+    });
+  }
+  function setEdgeValue(axisId, v) {
+    relationships.update((r) => {
+      const e = r.edges.find((x) => x.id === editingId);
+      if (e) {
+        if (!e.values) e.values = {};
+        e.values[axisId] = parseInt(v, 10) || 0;
+      }
+      return r;
+    });
+  }
 </script>
 
 <div>
@@ -98,6 +164,31 @@
     <button class="btn btn-sm btn-primary" onclick={addEdge} disabled={!fromId || !toId || fromId === toId}>
       Add
     </button>
+  </div>
+
+  <!-- Axis manager (global, DM-defined) -->
+  <div class="mb-4">
+    <div class="flex items-center gap-2 mb-2">
+      <h3 class="font-semibold">Axes</h3>
+      <button class="btn btn-xs btn-outline" onclick={addAxis}>+ Axis</button>
+    </div>
+    {#if $relationships.axes.length}
+      <div class="flex flex-wrap gap-2">
+        {#each $relationships.axes as a (a.id)}
+          <div class="flex items-center gap-1 bg-base-200 rounded px-2 py-1">
+            <input class="input input-xs input-bordered w-28" value={a.name}
+              onchange={(e) => setAxis(a.id, 'name', e.currentTarget.value)} />
+            <input type="number" class="input input-xs input-bordered w-14" value={a.min} title="min"
+              onchange={(e) => setAxis(a.id, 'min', e.currentTarget.value)} />
+            <input type="number" class="input input-xs input-bordered w-14" value={a.max} title="max"
+              onchange={(e) => setAxis(a.id, 'max', e.currentTarget.value)} />
+            <button class="btn btn-xs btn-error" onclick={() => removeAxis(a.id)}>×</button>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class="text-xs opacity-60">No axes yet. Add ≥3 (e.g. Trust, Fear, Respect) to plot relationship radars.</p>
+    {/if}
   </div>
 
   <!-- Graph canvas (square so circles stay round) -->
@@ -150,9 +241,51 @@
       {#each drawnEdges as e (e.id)}
         <div class="flex items-center justify-between bg-base-200 px-3 py-1 rounded text-sm">
           <span>{byId.get(e.from)?.name} <span class="opacity-60">—{e.label || '→'}→</span> {byId.get(e.to)?.name}</span>
-          <button class="btn btn-xs btn-error" onclick={() => removeEdge(e.id)}>×</button>
+          <div class="flex gap-1">
+            <button class="btn btn-xs btn-primary" onclick={() => openEdgeEditor(e.id)}>Edit</button>
+            <button class="btn btn-xs btn-error" onclick={() => removeEdge(e.id)}>×</button>
+          </div>
         </div>
       {/each}
     </div>
   {/if}
 </div>
+
+<!-- Edge editor: per-axis values + radar (with reverse overlay) -->
+<Modal bind:open={editorOpen} title="Edit Relationship">
+  {#if editingEdge}
+    <p class="mb-2 text-sm opacity-70">
+      {byId.get(editingEdge.from)?.name} → {byId.get(editingEdge.to)?.name}
+    </p>
+    <input
+      class="input input-bordered w-full mb-4"
+      placeholder="label (optional)"
+      value={editingEdge.label ?? ''}
+      onchange={(e) => setEdgeLabel(e.currentTarget.value)}
+    />
+
+    {#if $relationships.axes.length}
+      <div class="space-y-2 mb-4">
+        {#each $relationships.axes as a (a.id)}
+          <div class="flex items-center gap-2 text-sm">
+            <span class="w-28 truncate" title={a.name}>{a.name}</span>
+            <input
+              type="range" class="range range-sm range-primary flex-1"
+              min={a.min} max={a.max}
+              value={editingEdge.values[a.id] ?? a.min}
+              onchange={(e) => setEdgeValue(a.id, e.currentTarget.value)}
+            />
+            <span class="w-8 text-right tabular-nums">{editingEdge.values[a.id] ?? a.min}</span>
+          </div>
+        {/each}
+      </div>
+      <RadarChart axes={$relationships.axes} series={radarSeries} />
+    {:else}
+      <p class="text-sm opacity-60">Define axes (above the graph) to rate this relationship.</p>
+    {/if}
+
+    <div class="modal-action">
+      <button class="btn" onclick={() => (editorOpen = false)}>Close</button>
+    </div>
+  {/if}
+</Modal>

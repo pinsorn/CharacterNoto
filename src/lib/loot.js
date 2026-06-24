@@ -7,20 +7,45 @@
 
 // Roll a region. Returns [{ name, amount }] (possibly empty).
 // MUTATES region.items[].stock for finite items that drop — caller persists mapData after.
-export function rollRegion(region, { randomizeQty = true } = {}, rng = Math.random) {
+//   mode 'independent' (default): each item rolls its own % drop; yields 0..N items.
+//   mode 'weighted': exactly ONE item, chosen with dropChance used as a relative weight.
+export function rollRegion(region, { randomizeQty = true, mode = 'independent' } = {}, rng = Math.random) {
+  const items = region.items || [];
+  if (mode === 'weighted') return weightedRoll(items, randomizeQty, rng);
+
   const loot = [];
-  for (const it of region.items || []) {
+  for (const it of items) {
     if (rng() * 100 >= it.dropChance) continue; // failed the drop roll
-    const cap = Math.max(1, Math.floor(it.perRoll) || 1);
-    let amount = randomizeQty ? 1 + Math.floor(rng() * cap) : cap;
-    if (!it.infinite) {
-      if (it.stock <= 0) continue; // depleted
-      amount = Math.min(amount, it.stock); // can't take more than in stock
-      it.stock -= amount;
-    }
-    loot.push({ name: it.name, amount });
+    loot.push(takeItem(it, randomizeQty, rng));
   }
-  return loot;
+  return loot.filter(Boolean);
+}
+
+// Pick exactly one available item, weighted by dropChance. Returns [] if the pool is empty.
+function weightedRoll(items, randomizeQty, rng) {
+  const pool = items.filter((it) => (it.infinite || it.stock > 0) && it.dropChance > 0);
+  const totalW = pool.reduce((s, it) => s + it.dropChance, 0);
+  if (totalW <= 0) return [];
+  let r = rng() * totalW;
+  let pick = pool[pool.length - 1];
+  for (const it of pool) {
+    if (r < it.dropChance) { pick = it; break; }
+    r -= it.dropChance;
+  }
+  const taken = takeItem(pick, randomizeQty, rng);
+  return taken ? [taken] : [];
+}
+
+// Resolve quantity for a dropped item and deplete finite stock. Returns null if depleted.
+function takeItem(it, randomizeQty, rng) {
+  const cap = Math.max(1, Math.floor(it.perRoll) || 1);
+  let amount = randomizeQty ? 1 + Math.floor(rng() * cap) : cap;
+  if (!it.infinite) {
+    if (it.stock <= 0) return null;
+    amount = Math.min(amount, it.stock);
+    it.stock -= amount;
+  }
+  return { name: it.name, amount };
 }
 
 // Merge loot ([{name,amount}]) into a character's items[] (CASE-SENSITIVE, matching inventory rules).

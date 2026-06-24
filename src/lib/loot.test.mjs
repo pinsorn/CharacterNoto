@@ -73,4 +73,30 @@ function scriptedRng(values) {
   ok('mergeLootIntoItems case-sensitive');
 }
 
+// --- weighted mode: pick exactly one by cumulative weight ---
+{
+  const region = { items: [
+    { name: 'a', dropChance: 30, perRoll: 1, infinite: true },
+    { name: 'b', dropChance: 70, perRoll: 1, infinite: true },
+  ]};
+  // rng 0.1 → r = 0.1*100 = 10 < 30 → pick a (randomizeQty off → amount = perRoll = 1)
+  let loot = rollRegion(region, { mode: 'weighted', randomizeQty: false }, scriptedRng([0.1]));
+  assert.deepEqual(loot, [{ name: 'a', amount: 1 }], 'weighted low r picks first');
+  // rng 0.5 → r = 50 → skip a(30), pick b
+  loot = rollRegion(region, { mode: 'weighted', randomizeQty: false }, scriptedRng([0.5]));
+  assert.deepEqual(loot, [{ name: 'b', amount: 1 }], 'weighted picks by cumulative weight');
+  ok('weighted picks one by weight');
+}
+
+// --- weighted respects + depletes finite stock; empty pool → [] ---
+{
+  const region = { items: [{ name: 'x', dropChance: 100, perRoll: 10, infinite: false, stock: 3 }] };
+  let loot = rollRegion(region, { mode: 'weighted', randomizeQty: false }, scriptedRng([0.0]));
+  assert.deepEqual(loot, [{ name: 'x', amount: 3 }], 'weighted takes min(perRoll, stock)');
+  assert.equal(region.items[0].stock, 0, 'weighted depleted stock to 0');
+  loot = rollRegion(region, { mode: 'weighted', randomizeQty: false }, scriptedRng([0.0]));
+  assert.deepEqual(loot, [], 'weighted empty pool → []');
+  ok('weighted depletion + empty pool');
+}
+
 console.log(`\nAll ${n} checks passed.`);

@@ -82,12 +82,14 @@
   }
   function startVertexDrag(e, r, vIdx) {
     e.stopPropagation();
+    e.preventDefault();
     drag = { type: 'vertex', regionId: r.id, vIdx };
     live = { regionId: r.id, points: r.points.map((p) => ({ ...p })) };
   }
   function startBodyDrag(e, r) {
     if (!editMode) return;
     e.stopPropagation();
+    e.preventDefault();
     drag = { type: 'body', regionId: r.id, last: normPoint(e) };
     live = { regionId: r.id, points: r.points.map((p) => ({ ...p })) };
   }
@@ -179,7 +181,7 @@
   {/if}
 
   <!-- Map canvas -->
-  <div class="relative w-full bg-base-300 rounded overflow-hidden" style="aspect-ratio: 16 / 9;">
+  <div class="relative w-full bg-base-300 rounded overflow-hidden select-none" style="aspect-ratio: 16 / 9;">
     {#if $mapData.backgroundId}
       <BlobImage id={$mapData.backgroundId} alt="map" class="absolute inset-0 w-full h-full object-cover" />
     {/if}

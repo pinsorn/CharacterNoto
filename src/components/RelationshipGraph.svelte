@@ -35,6 +35,7 @@
   }
   function startDrag(e, id) {
     e.stopPropagation();
+    e.preventDefault(); // stop native text-selection / drag-image during the drag
     draggingId = id;
     live = { id, ...normPoint(e) };
   }
@@ -229,7 +230,7 @@
   {/if}
 
   <!-- Graph canvas (square so circles stay round) -->
-  <div class="relative w-full bg-base-300 rounded overflow-hidden mx-auto" style="aspect-ratio: 1/1; max-width: 600px;">
+  <div class="relative w-full bg-base-300 rounded overflow-hidden mx-auto select-none" style="aspect-ratio: 1/1; max-width: 600px;">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <svg
       bind:this={svgEl}

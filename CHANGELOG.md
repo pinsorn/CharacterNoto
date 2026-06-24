@@ -3,6 +3,11 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-06-24
+
+### Fixed
+- Dragging a node in the relationship graph (and dragging/reshaping a region on the Map) no longer triggers native text-selection / a drag-image "ghost" (which could render as a large white blob). Drag handlers now `preventDefault()` and the canvases are `select-none`.
+
 ## [3.3.0] - 2026-06-24
 
 ### Added (polish)

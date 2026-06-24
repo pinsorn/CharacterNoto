@@ -14,8 +14,6 @@
   // DM-forced hides applied to the players' view (players can't toggle these).
   const HIDES = [
     ['charParams', 'Character stats / params'],
-    ['charItems', 'Character inventory'],
-    ['charBadges', 'Character badges'],
     ['itemEffects', 'Item effects'],
     ['itemObtain', 'Item how-to-obtain'],
     ['craftDetails', 'Recipe details'],

@@ -22,10 +22,8 @@
   let hideItems = $state(false);
   let tileMode = $state(false);
 
-  // In viewer mode the DM's forced hides win; the local toggles drive the host's own view.
+  // In viewer mode the DM can force-hide stats/params; inventory + badges always stay visible.
   const effHideParams = $derived(viewer ? !!$receivedHides?.charParams : hideParams);
-  const effHideItems = $derived(viewer ? !!$receivedHides?.charItems : hideItems);
-  const effHideBadges = $derived(viewer ? !!$receivedHides?.charBadges : false);
 
   let importInput; // hidden <input type=file>
 
@@ -165,7 +163,7 @@
   <div class:tile-mode={tileMode}>
     <div id="character-list" class="grid gap-4">
       {#each $characters as char, i (char)}
-        <CharacterCard {i} hideParams={effHideParams} hideItems={effHideItems} hideBadges={effHideBadges} onEdit={openEdit} onDelete={openDelete} />
+        <CharacterCard {i} hideParams={effHideParams} {hideItems} onEdit={openEdit} onDelete={openDelete} />
       {/each}
     </div>
   </div>

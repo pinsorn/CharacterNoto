@@ -63,7 +63,7 @@ export const shareConfig = persisted('shareConfig', {
 });
 // Host-only: what to FORCE-hide in the players' view (players can't toggle these).
 export const viewerHides = persisted('viewerHides', {
-  charParams: false, charItems: false, charBadges: false,
+  charParams: false,
   itemEffects: false, itemObtain: false,
   craftDetails: false,
   mapDetails: false, relLabels: false,

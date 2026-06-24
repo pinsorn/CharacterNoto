@@ -55,8 +55,8 @@ const state = {
 
 // DM-forced hides pass through to the view
 {
-  const v = buildPublicView(state, { characters: true }, { charItems: true, relLabels: true });
-  assert.equal(v.hides.charItems, true, 'hides carried');
+  const v = buildPublicView(state, { characters: true }, { charParams: true, relLabels: true });
+  assert.equal(v.hides.charParams, true, 'hides carried');
   assert.equal(v.hides.relLabels, true, 'hides carried (2)');
   ok('hides pass through');
 }

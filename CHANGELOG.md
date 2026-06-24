@@ -3,6 +3,11 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-06-24
+
+### Changed
+- Removed "hide inventory" and "hide badges" from the DM's player-hide controls — character inventory and badges now always stay visible to players. The DM can still force-hide character stats/params, item effects & how-to-obtain, recipe details, map region details, and relationship edge labels.
+
 ## [3.6.0] - 2026-06-24
 
 ### Added — DM-controlled "Hide from players"

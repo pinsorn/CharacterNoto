@@ -4,6 +4,10 @@
   // Cross-tab: when a character card's Craft button sets `craftingFor` to an index, the
   // character-crafting modal opens for that character.
   import { craftingRecipes } from '../lib/stores.js';
+  import { viewer } from '../lib/mode.js';
+  import { receivedHides } from '../lib/p2p.js';
+
+  const hideDetails = $derived(viewer && !!$receivedHides?.craftDetails);
   import Modal from './Modal.svelte';
 
   // ---- Recipe list + search ----------------------------------------------
@@ -158,33 +162,35 @@
                 </p>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <span class="font-semibold text-sm">Materials Required:</span>
-                  <div class="mt-1 flex flex-wrap gap-1">
-                    {#if recipe.materials.length}
-                      {#each recipe.materials as m}
-                        <span class="badge badge-warning badge-sm">{m.name} x{m.quantity}</span>
-                      {/each}
-                    {:else}
-                      <em class="text-gray-500 text-sm">No materials</em>
-                    {/if}
+              {#if !hideDetails}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span class="font-semibold text-sm">Materials Required:</span>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      {#if recipe.materials.length}
+                        {#each recipe.materials as m}
+                          <span class="badge badge-warning badge-sm">{m.name} x{m.quantity}</span>
+                        {/each}
+                      {:else}
+                        <em class="text-gray-500 text-sm">No materials</em>
+                      {/if}
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <span class="font-semibold text-sm">Output:</span>
-                  <div class="mt-1 flex flex-wrap gap-1">
-                    {#if recipe.outputs.length}
-                      {#each recipe.outputs as o}
-                        <span class="badge badge-success badge-sm">{o.name} x{o.quantity}</span>
-                      {/each}
-                    {:else}
-                      <em class="text-gray-500 text-sm">No output</em>
-                    {/if}
+                  <div>
+                    <span class="font-semibold text-sm">Output:</span>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      {#if recipe.outputs.length}
+                        {#each recipe.outputs as o}
+                          <span class="badge badge-success badge-sm">{o.name} x{o.quantity}</span>
+                        {/each}
+                      {:else}
+                        <em class="text-gray-500 text-sm">No output</em>
+                      {/if}
+                    </div>
                   </div>
                 </div>
-              </div>
+              {/if}
             </div>
           </div>
         </div>

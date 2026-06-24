@@ -7,6 +7,12 @@
   import { toast } from '../lib/toast.js';
   import { useItemFor } from '../lib/ui.js';
   import Modal from './Modal.svelte';
+  import { viewer } from '../lib/mode.js';
+  import { receivedHides } from '../lib/p2p.js';
+
+  // DM-forced hides in the player view.
+  const hideObtain = $derived(viewer && !!$receivedHides?.itemObtain);
+  const hideEffects = $derived(viewer && !!$receivedHides?.itemEffects);
 
   let search = $state('');
   let modalOpen = $state(false);
@@ -188,14 +194,16 @@
             </div>
 
             <div class="grid gap-3 mt-3">
-              <div>
-                <span class="font-semibold text-sm">How to Obtain:</span>
-                <p class="text-sm mt-1">
-                  {#if item.howToObtain}{item.howToObtain}{:else}<em class="text-gray-500"
-                      >Not specified</em
-                    >{/if}
-                </p>
-              </div>
+              {#if !hideObtain}
+                <div>
+                  <span class="font-semibold text-sm">How to Obtain:</span>
+                  <p class="text-sm mt-1">
+                    {#if item.howToObtain}{item.howToObtain}{:else}<em class="text-gray-500"
+                        >Not specified</em
+                      >{/if}
+                  </p>
+                </div>
+              {/if}
 
               <div>
                 <span class="font-semibold text-sm">Description:</span>
@@ -206,18 +214,20 @@
                 </p>
               </div>
 
-              <div>
-                <span class="font-semibold text-sm">Effects when used:</span>
-                <div class="mt-1 flex flex-wrap gap-1">
-                  {#if item.effects && item.effects.length}
-                    {#each item.effects as effect}
-                      <span class="badge badge-outline badge-sm">{effectLabel(effect)}</span>
-                    {/each}
-                  {:else}
-                    <em class="text-gray-500 text-sm">No effects</em>
-                  {/if}
+              {#if !hideEffects}
+                <div>
+                  <span class="font-semibold text-sm">Effects when used:</span>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    {#if item.effects && item.effects.length}
+                      {#each item.effects as effect}
+                        <span class="badge badge-outline badge-sm">{effectLabel(effect)}</span>
+                      {/each}
+                    {:else}
+                      <em class="text-gray-500 text-sm">No effects</em>
+                    {/if}
+                  </div>
                 </div>
-              </div>
+              {/if}
             </div>
 
             <div class="mt-3">

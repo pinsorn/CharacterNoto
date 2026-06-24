@@ -5,6 +5,10 @@
   import { mapData } from '../lib/stores.js';
   import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
   import { fileToImageBlob } from '../lib/avatar.js';
+  import { viewer } from '../lib/mode.js';
+  import { receivedHides } from '../lib/p2p.js';
+
+  const hideDetails = $derived(viewer && !!$receivedHides?.mapDetails);
   import BlobImage from './BlobImage.svelte';
   import RegionEditor from './RegionEditor.svelte';
 
@@ -216,14 +220,16 @@
           }}
         />
         {@const c = centroid(rp)}
-        <text
-          x={c.x}
-          y={c.y}
-          fill="white"
-          font-size="0.035"
-          text-anchor="middle"
-          style="pointer-events: none; paint-order: stroke; stroke: black; stroke-width: 0.004;"
-        >{r.name}</text>
+        {#if !hideDetails}
+          <text
+            x={c.x}
+            y={c.y}
+            fill="white"
+            font-size="0.035"
+            text-anchor="middle"
+            style="pointer-events: none; paint-order: stroke; stroke: black; stroke-width: 0.004;"
+          >{r.name}</text>
+        {/if}
         {#if editMode}
           {#each rp as p, vi}
             <circle
@@ -265,7 +271,7 @@
           <div class="flex items-center justify-between bg-base-200 p-2 rounded">
             <div class="flex items-center gap-2">
               <span class="badge" style={`background:${hex(r.color)};border:none;color:white`}>{r.name}</span>
-              <span class="text-sm opacity-70">{r.items.length} item(s)</span>
+              {#if !hideDetails}<span class="text-sm opacity-70">{r.items.length} item(s)</span>{/if}
             </div>
             <button class="btn btn-xs btn-primary" onclick={() => openRegion(r.id)}>Edit / Roll</button>
           </div>

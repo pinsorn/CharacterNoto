@@ -4,10 +4,11 @@
 import Peer from 'peerjs';
 import { writable, get } from 'svelte/store';
 import { snapshot, applySnapshot } from './publicview.js';
-import { characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet, shareConfig } from './stores.js';
+import { characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet, shareConfig, viewerHides } from './stores.js';
 
 export const p2pStatus = writable({ role: null, code: null, connected: 0, error: null });
 export const receivedShare = writable(null); // player: which tabs the host shared
+export const receivedHides = writable({}); // player: DM-forced hide flags
 
 let peer = null;
 let conns = [];
@@ -27,7 +28,7 @@ export function hostStart(shareGetter) {
     peer.on('open', (id) => {
       setStatus({ role: 'host', code: id, connected: 0, error: null });
       // re-broadcast (debounced) whenever shared data changes
-      const stores = [characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet, shareConfig];
+      const stores = [characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet, shareConfig, viewerHides];
       unsubs = stores.map((s) => s.subscribe(() => scheduleBroadcast()));
       resolve(id);
     });
@@ -72,6 +73,7 @@ export function playerJoin(code) {
     conn.on('open', () => setStatus({ connected: 1, error: null }));
     conn.on('data', (snap) => {
       receivedShare.set(snap?.view?.share || {});
+      receivedHides.set(snap?.view?.hides || {});
       applySnapshot(snap);
     });
     conn.on('close', () => setStatus({ connected: 0 }));

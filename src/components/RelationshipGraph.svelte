@@ -2,6 +2,10 @@
   // Character relationship graph. Nodes = characters (by id), edges = directed labelled
   // relationships. Nodes are draggable; positions persist. Square canvas so circles stay round.
   import { characters, relationships } from '../lib/stores.js';
+  import { viewer } from '../lib/mode.js';
+  import { receivedHides } from '../lib/p2p.js';
+
+  const hideLabels = $derived(viewer && !!$receivedHides?.relLabels);
   import Modal from './Modal.svelte';
   import RadarChart from './RadarChart.svelte';
 
@@ -254,7 +258,7 @@
           stroke={e.stroke} stroke-width={e.width} vector-effect="non-scaling-stroke"
           marker-end="url(#arrow)"
         />
-        {#if e.label}
+        {#if e.label && !hideLabels}
           <text x={e.mid.x} y={e.mid.y} fill="#e2e8f0" font-size="0.028" text-anchor="middle"
             style="paint-order: stroke; stroke: #1e293b; stroke-width: 0.006;">{e.label}</text>
         {/if}
@@ -278,7 +282,7 @@
     <div class="mt-4 grid gap-1 max-w-xl">
       {#each drawnEdges as e (e.id)}
         <div class="flex items-center justify-between bg-base-200 px-3 py-1 rounded text-sm">
-          <span>{byId.get(e.from)?.name} <span class="opacity-60">—{e.label || '→'}→</span> {byId.get(e.to)?.name}</span>
+          <span>{byId.get(e.from)?.name} <span class="opacity-60">—{(!hideLabels && e.label) || '→'}→</span> {byId.get(e.to)?.name}</span>
           <div class="flex gap-1">
             <button class="btn btn-xs btn-primary" onclick={() => openEdgeEditor(e.id)}>Edit</button>
             <button class="btn btn-xs btn-error" onclick={() => removeEdge(e.id)}>×</button>

@@ -3,6 +3,12 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-06-24
+
+### Added — DM-controlled "Hide from players"
+- The Share panel now lets the **host force-hide** parts of the players' view; **players can't toggle these** (the settings come from the DM and re-broadcast live). Hideable: character stats/params, inventory, badges; item effects & how-to-obtain; recipe details; map region details (names + loot counts); relationship edge labels.
+- Enforced through the shared payload (`viewerHides`), applied in the read-only viewer. Pure `buildPublicView` carries the flags (tested).
+
 ## [3.5.0] - 2026-06-24
 
 ### Added — DM → Player live sharing (serverless, P2P)

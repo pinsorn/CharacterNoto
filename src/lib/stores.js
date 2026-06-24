@@ -61,6 +61,13 @@ export const relationships = persisted('relationships', { axes: [], edges: [], p
 export const shareConfig = persisted('shareConfig', {
   characters: true, items: true, crafting: true, map: true, relationships: true, dice: true,
 });
+// Host-only: what to FORCE-hide in the players' view (players can't toggle these).
+export const viewerHides = persisted('viewerHides', {
+  charParams: false, charItems: false, charBadges: false,
+  itemEffects: false, itemObtain: false,
+  craftDetails: false,
+  mapDetails: false, relLabels: false,
+});
 // 3D dice builder: any number of dice, each with any number of custom face labels.
 export const diceSet = persisted('diceSet', [
   { id: 'd1', faces: ['1', '2', '3', '4', '5', '6'] },

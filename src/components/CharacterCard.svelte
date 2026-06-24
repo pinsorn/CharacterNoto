@@ -18,6 +18,7 @@
     i,
     hideParams = false,
     hideItems = false,
+    hideBadges = false,
     onEdit,        // () => parent opens the rename modal for this card
     onDelete       // () => parent opens the delete-confirm modal for this card
   } = $props();
@@ -306,11 +307,13 @@
         </div>
       </div>
 
-      <div class="flex flex-wrap gap-2 badge-container p-2">
-        {#each earned as b}
-          <span class="badge badge-{b.color} tooltip" data-tip={b.desc}>{b.icon} {b.name}</span>
-        {/each}
-      </div>
+      {#if !hideBadges}
+        <div class="flex flex-wrap gap-2 badge-container p-2">
+          {#each earned as b}
+            <span class="badge badge-{b.color} tooltip" data-tip={b.desc}>{b.icon} {b.name}</span>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Stats: render only if the property exists (non-characters have neither) -->

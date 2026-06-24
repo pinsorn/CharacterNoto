@@ -46,11 +46,19 @@ const state = {
   ok('imageIdsOf excludes hidden-entity images');
 }
 
-// nothing shared → minimal view
+// nothing shared → minimal view (share + hides maps only, no data)
 {
   const v = buildPublicView(state, {});
-  assert.deepEqual(Object.keys(v), ['share'], 'empty share → only share map');
+  assert.deepEqual(Object.keys(v).sort(), ['hides', 'share'], 'empty share → only share+hides maps');
   ok('empty share → nothing leaked');
+}
+
+// DM-forced hides pass through to the view
+{
+  const v = buildPublicView(state, { characters: true }, { charItems: true, relLabels: true });
+  assert.equal(v.hides.charItems, true, 'hides carried');
+  assert.equal(v.hides.relLabels, true, 'hides carried (2)');
+  ok('hides pass through');
 }
 
 console.log(`\nAll ${n} checks passed.`);

@@ -2,15 +2,16 @@
 // one on the player side. Visibility is enforced HERE (at the source): only shared tabs,
 // minus any entity flagged `hidden`. Players never receive what isn't shared.
 import { get } from 'svelte/store';
-import { characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet } from './stores.js';
+import { characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet, viewerHides } from './stores.js';
 import { getBlob, putBlob } from './blobstore.js';
 
 // share: { characters, items, crafting, map, relationships, dice } booleans.
+// hides: DM-forced hide flags applied in the player's read-only view (players can't toggle).
 // state: { characters, badges, itemDatabase, craftingRecipes, mapData, relationships, diceSet }.
 // Pure → unit-testable.
-export function buildPublicView(state, share) {
+export function buildPublicView(state, share, hides = {}) {
   const keep = (arr) => (arr || []).filter((e) => !e?.hidden);
-  const v = { share: { ...share } };
+  const v = { share: { ...share }, hides: { ...hides } };
   if (share.characters) {
     v.characters = keep(state.characters);
     v.badges = state.badges || [];
@@ -49,7 +50,8 @@ export async function snapshot(share) {
       relationships: get(relationships),
       diceSet: get(diceSet),
     },
-    share
+    share,
+    get(viewerHides)
   );
   const images = {};
   for (const id of imageIdsOf(view)) {

@@ -3,7 +3,7 @@
   import Items from './components/Items.svelte';
   import Crafting from './components/Crafting.svelte';
   import MapTab from './components/MapTab.svelte';
-  import DiceRoller from './components/DiceRoller.svelte';
+  import DiceTab from './components/DiceTab.svelte';
   import RelationshipGraph from './components/RelationshipGraph.svelte';
   import Toast from './components/Toast.svelte';
   import UseItemModal from './components/UseItemModal.svelte';
@@ -78,7 +78,7 @@
   <div class:hidden={tab !== 'crafting'}><Crafting /></div>
   <div class:hidden={tab !== 'map'}><MapTab /></div>
   <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
-  <div class:hidden={tab !== 'dice'}><DiceRoller /></div>
+  <div class:hidden={tab !== 'dice'}><DiceTab /></div>
 </div>
 
 <Toast />

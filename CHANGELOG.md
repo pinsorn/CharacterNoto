@@ -3,6 +3,15 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-06-24
+
+### Added — 3D Dice
+- A real **3D dice** builder on the Dice tab (the notation roller stays below it). Built with **Three.js** (render) + **cannon-es** (physics tumble).
+- **Any number of dice**, each with **any number of faces** and **custom labels per face** (comma-separated); dice can differ from one another. Quick presets d4–d100.
+- Rolling throws the dice with real physics, then each die eases to reveal its face. The **outcome is a fair uniform RNG pick** (`lib/dice3d`, tested) that the animation visualises, so results are fair and the shown face always matches the result; the sum is shown when every face is numeric.
+- Each die is an N-gon **barrel** (no regular polyhedron exists for arbitrary face counts), with its labels as a strip texture.
+- `diceSet` persists and is included in the zip backup.
+
 ## [3.3.1] - 2026-06-24
 
 ### Fixed

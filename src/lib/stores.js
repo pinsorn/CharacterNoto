@@ -52,3 +52,8 @@ export const mapData = persisted('mapData', { backgroundId: null, regions: [] })
 // Character relationship graph: DM-defined axes (global), directed edges with per-axis values
 // + labels, and saved node positions (by character id).
 export const relationships = persisted('relationships', { axes: [], edges: [], positions: {} });
+// 3D dice builder: any number of dice, each with any number of custom face labels.
+export const diceSet = persisted('diceSet', [
+  { id: 'd1', faces: ['1', '2', '3', '4', '5', '6'] },
+  { id: 'd2', faces: ['1', '2', '3', '4', '5', '6'] },
+]);

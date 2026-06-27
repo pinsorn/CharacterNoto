@@ -1,6 +1,6 @@
 {
   "name": "characternoto",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "description": "Character / item / crafting / map manager — Svelte app",
   "type": "module",
   "scripts": {

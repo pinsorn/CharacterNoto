@@ -3,6 +3,13 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-06-27
+
+### Changed — symmetric (Platonic) 3D dice
+- Dice whose face count is 4, 6, 8, 12, or 20 now render as the real symmetric solid — **tetrahedron, cube, octahedron, dodecahedron, icosahedron** — instead of the N-gon barrel, with one label per face. Every other count (including the d10, which is a pentagonal trapezohedron — not a Platonic solid — so it'd need custom geometry) keeps the barrel.
+- Each face gets a full orientation frame (normal + in-plane up), used for both label placement and the reveal pose, so the rolled face squares up to the camera **upright by construction**. Reveal = `TILT · qFace⁻¹`.
+- Face anchors are derived by grouping the solid's triangles by normal (`dot > 0.99`); a count mismatch falls back to the barrel. Validated against all five three.js geometries (grouped face count + upright/camera-facing reveal for every face).
+
 ## [3.6.1] - 2026-06-24
 
 ### Changed

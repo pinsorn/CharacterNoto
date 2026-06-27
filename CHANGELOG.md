@@ -3,6 +3,11 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.1] - 2026-06-27
+
+### Fixed
+- Add/Edit Crafting Recipe modal: the **Materials Required** and **Output Items** columns no longer overflow and overlap (the "Add Output" button colliding with a delete ×). The modal is now wider (`max-w-2xl`) and the flex/grid items get `min-w-0` so they shrink to fit instead of spilling past the box. Modal gained an optional `boxClass` prop for per-use sizing.
+
 ## [3.7.0] - 2026-06-27
 
 ### Changed — symmetric (Platonic) 3D dice

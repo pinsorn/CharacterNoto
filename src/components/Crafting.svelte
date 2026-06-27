@@ -200,7 +200,7 @@
 </div>
 
 <!-- Add/Edit Crafting Recipe Modal -->
-<Modal bind:open={recipeOpen} title={editIndex !== null ? 'Edit Crafting Recipe' : 'Add Crafting Recipe'}>
+<Modal bind:open={recipeOpen} boxClass="max-w-2xl" title={editIndex !== null ? 'Edit Crafting Recipe' : 'Add Crafting Recipe'}>
   <div class="form-control mb-4">
     <label class="label">Recipe Name</label>
     <input type="text" class="input input-bordered" placeholder="Recipe name" bind:value={form.name} />
@@ -213,12 +213,12 @@
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
     <!-- Materials Section -->
-    <div>
+    <div class="min-w-0">
       <h4 class="font-bold mb-2">Materials Required</h4>
       <div class="space-y-2 mb-3">
         {#each form.materials as material, i}
           <div class="flex gap-2 items-center">
-            <input type="text" class="input input-sm input-bordered flex-1" placeholder="Material name" bind:value={material.name} />
+            <input type="text" class="input input-sm input-bordered flex-1 min-w-0" placeholder="Material name" bind:value={material.name} />
             <input type="number" class="input input-sm input-bordered w-20" min="1" bind:value={material.quantity} />
             <button type="button" class="btn btn-error btn-xs" onclick={() => removeMaterial(i)}>×</button>
           </div>
@@ -228,12 +228,12 @@
     </div>
 
     <!-- Output Section -->
-    <div>
+    <div class="min-w-0">
       <h4 class="font-bold mb-2">Output Items</h4>
       <div class="space-y-2 mb-3">
         {#each form.outputs as output, i}
           <div class="flex gap-2 items-center">
-            <input type="text" class="input input-sm input-bordered flex-1" placeholder="Output item name" bind:value={output.name} />
+            <input type="text" class="input input-sm input-bordered flex-1 min-w-0" placeholder="Output item name" bind:value={output.name} />
             <input type="number" class="input input-sm input-bordered w-20" min="1" bind:value={output.quantity} />
             <button type="button" class="btn btn-error btn-xs" onclick={() => removeOutput(i)}>×</button>
           </div>

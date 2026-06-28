@@ -10,10 +10,11 @@
   import { mapData, characters } from '../lib/stores.js';
   import { putBlob, getBlob, delBlob, newImageId } from '../lib/blobstore.js';
   import { voxelUI, voxelEnv, voxelObjUI } from '../lib/voxel/store.js';
-  import { CHUNK, WORLD_HEIGHT, MAP_SIZES, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
+  import { CHUNK, CHUNK_DIM, WORLD_HEIGHT, MAP_SIZES, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
   import { createChunk, resizeChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
-  import { saveChunk, loadChunk } from '../lib/voxel/chunkStore.js';
+  import { saveChunk, loadChunk, loadMeta } from '../lib/voxel/chunkStore.js';
+  import { ChunkManager } from './map3d/chunkManager.js';
   import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
   import TokenPanel from './map3d/TokenPanel.svelte';
   import { createTokenGroup, syncTokenGroup, SIZES } from './map3d/tokens.js';
@@ -43,6 +44,10 @@
   let objSeed = 1;
   let lastScatterKey = null;
   let lastRev = 0; // tracks voxelUI.mapRev to reload when the Image Editor rewrites the map
+  let bigMap = $state(false); // chunked map (> single-chunk size): rendered via streaming ChunkManager
+  let manager = null; // ChunkManager for chunked maps (null = small single-chunk map)
+  let bigTokensSynced = false; // re-snap tokens once the streaming window first meshes
+  const VIEW_RADIUS = 2; // Chebyshev chunk radius kept loaded around the camera target (5×5 = 320²)
   let env; // environment system (sky/time/season/weather/fog)
   let envMinute = $state(720); // live clock when animated
   let lastT = 0;
@@ -62,8 +67,9 @@
   let possessing = $state(false);
   const look = { yaw: 0, pitch: 0, dragging: false, px: 0, py: 0 };
 
-  // token placement helpers
-  const heightAt = (gx, gz) => (lastDense ? surfaceY(lastDense, gx, gz, chunk.size) : 6);
+  // token placement helpers — chunked maps read the streaming manager; small maps the dense cache.
+  const heightAt = (gx, gz) => (manager ? manager.heightAt(gx, gz) : lastDense ? surfaceY(lastDense, gx, gz, chunk.size) : 6);
+  const mapExtentVox = () => (manager ? manager.extentX : chunk.size); // map side length in voxels
   const charLookup = (id) => {
     const c = get(characters).find((x) => x.id === id);
     return c ? { name: c.name || '?', color: c.color } : null;
@@ -113,10 +119,10 @@
     const key = `${gx},${gz}`;
     if (!start && key === lastScatterKey) return; // throttle: only when the cell changes
     lastScatterKey = key;
-    appendObjects(scatterInstances(o.propId, gx, gz, { radius: o.radius, density: o.density, jitter: o.jitter, scaleVar: o.scaleVar, yawRandom: o.yawRandom, size: chunk.size }, heightAt, objSeed++));
+    appendObjects(scatterInstances(o.propId, gx, gz, { radius: o.radius, density: o.density, jitter: o.jitter, scaleVar: o.scaleVar, yawRandom: o.yawRandom, size: mapExtentVox() }, heightAt, objSeed++));
   }
 
-  const clampCell = (v) => Math.min(chunk.size - 1, Math.max(0, v));
+  const clampCell = (v) => Math.min(mapExtentVox() - 1, Math.max(0, v));
   const colIdx = (x, z) => z * chunk.size + x;
   const denseGet = (dense) => (x, y, z) => dense[(y * chunk.size + z) * chunk.size + x];
 
@@ -143,20 +149,23 @@
     if (ui.tool === 'place' || ui.tool === 'erase') {
       const off = ui.tool === 'place' ? 0.5 : -0.5;
       const x = Math.floor(p.x + n.x * off), y = Math.floor(p.y + n.y * off), z = Math.floor(p.z + n.z * off);
-      if (ui.tool === 'place') placeBlock(chunk, x, y, z, ui.blockId);
-      else eraseVoxel(chunk, x, y, z);
-    } else {
-      const cx = clampCell(Math.floor(p.x - n.x * 0.01));
-      const cz = clampCell(Math.floor(p.z - n.z * 0.01));
-      if (start && ui.tool === 'flatten') strokeTargetH = chunk.height[colIdx(cx, cz)];
-      paintBrush(chunk, cx, cz, {
-        tool: ui.tool, radius: ui.brushRadius, strength: ui.brushStrength,
-        shape: ui.brushShape, falloff: ui.brushFalloff, target: ui.targetHeight,
-        biomeId: ui.biomeId, seed: strokeSeed,
-        baseline: ui.tool === 'flatten' ? strokeTargetH : undefined,
-      });
+      const edit = (ch, lx, ly, lz) => (ui.tool === 'place' ? placeBlock(ch, lx, ly, lz, ui.blockId) : eraseVoxel(ch, lx, ly, lz));
+      if (manager) manager.editBlockAtWorld(x, y, z, edit); // chunked map streams the re-mesh itself
+      else { edit(chunk, x, y, z); dirtyMesh = true; }
+      return;
     }
-    dirtyMesh = true;
+    const cx = clampCell(Math.floor(p.x - n.x * 0.01));
+    const cz = clampCell(Math.floor(p.z - n.z * 0.01));
+    // flatten: one shared baseline for the whole stroke (chunked → read via manager, not the dead chunk).
+    if (start && ui.tool === 'flatten') strokeTargetH = manager ? manager.heightAt(cx, cz) : chunk.height[colIdx(cx, cz)];
+    const opts = {
+      tool: ui.tool, radius: ui.brushRadius, strength: ui.brushStrength,
+      shape: ui.brushShape, falloff: ui.brushFalloff, target: ui.targetHeight,
+      biomeId: ui.biomeId, seed: strokeSeed,
+      baseline: ui.tool === 'flatten' ? strokeTargetH : undefined,
+    };
+    if (manager) manager.brushAtWorld(cx, cz, ui.brushRadius, (sc, lcx, lcz) => paintBrush(sc, lcx, lcz, opts));
+    else { paintBrush(chunk, cx, cz, opts); dirtyMesh = true; }
   }
 
   function setNdc(e) {
@@ -166,7 +175,8 @@
   }
   function pick(e) {
     setNdc(e);
-    const hits = raycaster.intersectObjects([terrainMesh, pickPlane].filter(Boolean));
+    const targets = manager ? manager.raycastTargets() : [terrainMesh, pickPlane].filter(Boolean);
+    const hits = raycaster.intersectObjects(targets);
     return hits[0] || null;
   }
   function pickToken(e) {
@@ -299,7 +309,7 @@
 
   function scheduleSave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveChunk(get(voxelUI).mapId, chunk), 500);
+    saveTimer = setTimeout(() => (manager ? manager.save() : saveChunk(get(voxelUI).mapId, chunk)), 500);
   }
   function scheduleTopview() {
     clearTimeout(topTimer);
@@ -350,11 +360,44 @@
   function setPreset(preset) {
     voxelUI.update((u) => ({ ...u, cameraPreset: preset }));
     if (!camera) return;
+    if (manager) {
+      // Frame the streamed window around the current orbit target (not the whole huge map).
+      const t = controls.target, d = CHUNK_DIM * 2.6;
+      if (preset === 'top') camera.position.set(t.x, d * 1.7, t.z + 0.001);
+      else camera.position.set(t.x + d, d, t.z + d);
+      controls.update();
+      return;
+    }
     const c = chunk.size;
     if (preset === 'top') camera.position.set(c / 2, c * 1.7, c / 2 + 0.001);
     else camera.position.set(c * 1.15, c * 1.0, c * 1.15);
     controls.target.set(c / 2, 0, c / 2);
     controls.update();
+  }
+
+  // Switch the view into streaming mode for a chunked (big) map: drop the single-chunk mesh/grid,
+  // spin up a ChunkManager, frame the map centre, and prime the first window.
+  function setupBigMap(meta) {
+    bigMap = true;
+    bigTokensSynced = false;
+    if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
+    if (gridHelper) gridHelper.visible = false;
+    if (pickPlane) pickPlane.visible = false;
+    lastDense = null;
+    manager?.dispose();
+    manager = new ChunkManager(scene, THREE, get(voxelUI).mapId, meta, terrainMat);
+    const cx = manager.extentX / 2, cz = manager.extentZ / 2;
+    controls.target.set(cx, 0, cz);
+    setPreset(get(voxelUI).cameraPreset);
+    manager.setView(cx, cz, VIEW_RADIUS);
+  }
+  // Leave streaming mode (a big map was replaced by a small single-chunk one).
+  function teardownBigMap() {
+    bigMap = false;
+    manager?.dispose();
+    manager = null;
+    if (gridHelper) gridHelper.visible = true;
+    if (pickPlane) pickPlane.visible = true;
   }
 
   // (Re)build the ground grid + invisible pick plane sized to the current map.
@@ -372,6 +415,7 @@
   }
 
   function resizeMap(n) {
+    if (manager) return; // chunked maps have a fixed grid extent — size is set by the Image Editor
     if (n === chunk.size) return;
     chunk = resizeChunk(chunk, n); // preserves the overlapping region
     voxelUI.update((u) => ({ ...u, mapSize: n }));
@@ -383,6 +427,7 @@
   }
 
   function resetMap() {
+    if (manager) return; // streaming map: reset/regenerate from the Image Editor
     if (!confirm('Reset the 3D map to flat ground? This clears terrain edits.')) return;
     chunk = createChunk(0, 0, 6, 0, chunk.size);
     rebuild();
@@ -392,6 +437,7 @@
 
   // Apply an uploaded image to the terrain: height (brightness), biome (colour), or scatter objects.
   function applyImage(imageData, mode, opts) {
+    if (manager) return; // single-chunk image import is for small maps; use the Image Editor tab for big maps
     const n = chunk.size;
     if (mode === 'height') {
       chunk.height = imageToHeights(imageData, n, opts);
@@ -447,13 +493,16 @@
 
     // Load persisted chunk (or start flat), then build + initial topview.
     lastRev = get(voxelUI).mapRev || 0; // baseline so the reload effect only fires on real bumps
-    loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
-      chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
-      buildGrid(); // size may differ from the initial default
-      rebuild();
-      setPreset(get(voxelUI).cameraPreset);
-      renderer.render(scene, camera);
-      if (!get(mapData).backgroundId) renderTopview();
+    loadMeta(get(voxelUI).mapId).then((meta) => {
+      if (meta && (meta.wChunks > 1 || meta.hChunks > 1)) { setupBigMap(meta); return; } // chunked → stream
+      loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
+        chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
+        buildGrid(); // size may differ from the initial default
+        rebuild();
+        setPreset(get(voxelUI).cameraPreset);
+        renderer.render(scene, camera);
+        if (!get(mapData).backgroundId) renderTopview();
+      });
     });
 
     lastT = performance.now();
@@ -464,6 +513,10 @@
       if (possessing) applyLook();
       else controls.update();
       if (env) envMinute = env.update(dt, get(voxelEnv)).minuteOfDay;
+      if (manager) {
+        manager.setView(controls.target.x, controls.target.z, VIEW_RADIUS); // stream chunks around the orbit target
+        if (!bigTokensSynced && manager.loadedCount() > 0) { bigTokensSynced = true; syncTokens(); } // snap once meshed
+      }
       if (dirtyMesh) { rebuild(); dirtyMesh = false; }
       renderer.render(scene, camera);
     };
@@ -486,6 +539,7 @@
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     container?._cleanup?.();
+    manager?.dispose();
     env?.dispose();
     topTarget?.dispose();
     renderer?.dispose();
@@ -525,13 +579,17 @@
     const rev = $voxelUI.mapRev;
     if (!renderer || rev === lastRev) return;
     lastRev = rev;
-    loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
-      if (!loaded) return;
-      chunk = loaded;
-      buildGrid();
-      rebuild();
-      setPreset(get(voxelUI).cameraPreset);
-      scheduleTopview();
+    loadMeta(get(voxelUI).mapId).then((meta) => {
+      if (meta && (meta.wChunks > 1 || meta.hChunks > 1)) { setupBigMap(meta); return; } // chunked → stream
+      if (manager) teardownBigMap(); // a big map was replaced by a small single-chunk one
+      loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
+        if (!loaded) return;
+        chunk = loaded;
+        buildGrid();
+        rebuild();
+        setPreset(get(voxelUI).cameraPreset);
+        scheduleTopview();
+      });
     });
   });
 </script>
@@ -548,13 +606,15 @@
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'top' ? 'btn-active' : ''}" onclick={() => setPreset('top')}>Top</button>
     </div>
-    <label class="flex items-center gap-1 text-xs">Size
-      <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
-        {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
-      </select>
-    </label>
-    <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
-    <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+    {#if !bigMap}
+      <label class="flex items-center gap-1 text-xs">Size
+        <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
+          {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
+        </select>
+      </label>
+      <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
+      <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+    {/if}
   </div>
 
   <!-- Tools (terrain mode) -->
@@ -622,6 +682,11 @@
     <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style="height: 460px;"></div>
     {#if possessing}
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
+    {/if}
+    {#if bigMap}
+      <div class="absolute top-2 left-2 text-xs px-2 py-1 rounded bg-base-300/80 opacity-80 pointer-events-none">
+        Streaming chunked map — right-drag to orbit · middle-drag to pan & explore
+      </div>
     {/if}
   </div>
 

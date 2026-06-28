@@ -3,6 +3,21 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.11.0] - 2026-06-28
+
+### Added — Unlimited 3D maps (streaming engine)
+- **3D streaming render for unlimited maps.** Maps larger than 256 (generated as a grid of 64-voxel
+  chunks by the Image Editor) now render **and edit** directly in the **3D Map** tab — previously they
+  showed only a top-down note. A new `ChunkManager` streams chunks in a radius around the camera target:
+  it loads/unloads from IndexedDB and meshes each chunk **off-thread in a Web Worker** (seam-correct via a
+  1-cell apron from neighbours), so a ~5000² map stays responsive a window at a time.
+- **Right-drag to orbit, middle-drag to pan & explore** the streamed map; the loaded window follows the
+  camera target (chunks load/unload around it).
+- **Full terrain editing on big maps** — every brush (raise/lower/flatten/smooth/roughen/set-height/carve/
+  paint-biome) and block place/erase works **across chunk seams** (cross-chunk edits re-mesh with no crack)
+  and persists per-chunk to IndexedDB.
+- Small maps (≤256) keep the unchanged single-chunk path (greedy mesh, full editing).
+
 ## [3.10.0] - 2026-06-28
 
 ### Added — Image Editor

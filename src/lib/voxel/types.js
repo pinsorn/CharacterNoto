@@ -2,6 +2,7 @@
 // Adapted from voxeldnd-spec-v1.0.md §3–§4 for the Svelte app. Plain JS + JSDoc (no TS here).
 
 export const CHUNK = 32; // DEFAULT columns per side for a fresh map (per-map `size` overrides it)
+export const CHUNK_DIM = 64; // streaming engine: fixed chunk side length (a map = a grid of these)
 export const WORLD_HEIGHT = 64; // max voxel layers (y)
 export const DEFAULT_VOXEL_FT = 5; // build/test at 5 ft coarse first (decision #3)
 

@@ -15,6 +15,17 @@ export const voxelUI = persisted('voxelUI', {
   cameraPreset: 'iso', // iso | top
 });
 
+// Object painter (spec §9): scatter / hand-place props on the terrain.
+export const voxelObjUI = persisted('voxelObjUI', {
+  propId: 'pine',
+  mode: 'scatter', // scatter | place
+  radius: 3,
+  density: 0.5, // instances per cell within the brush disc
+  jitter: 0.4,
+  scaleVar: 0.3,
+  yawRandom: true,
+});
+
 // Per-map environment (spec §11). Static for S0; animation/weather layer on at L6.
 export const voxelEnv = persisted('voxelEnv', {
   mode: 'static', // static | animated

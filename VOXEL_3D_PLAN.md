@@ -43,8 +43,10 @@ before the next. Algorithmic pieces leave a runnable `*.test.mjs`.
       surface-snap; possession POV (drag-look + WASD, Esc). `map3d/tokens.js` (mesh, tested) +
       `TokenPanel.svelte`; tokens in `mapData` (P2P + zip via publicview); bake into topview so
       players see them on the Map tab. **DONE, verified E2E.** Imported-mesh/voxel-figure tokens → S3.
-- [ ] **S3 L4 Object system** — Object Builder (objectVoxelSizeFt) + prop library + Object
-      Painter (scatter + hand-place), InstancedMesh per prop.
+- [x] **S3 L4 Object system** — built-in prop library (pine/tree/bush/rock/boulder/stump/crystal,
+      vertex-coloured) + Object Painter (scatter + hand-place, seeded) + InstancedMesh per prop +
+      topview bake + persist (mapData.objects, P2P/zip). `map3d/objects.js` (tested) + `ObjectPanel`.
+      **DONE, verified E2E** (pine forest). Object Builder (custom voxel props) → deferred.
 - [ ] **S4 L1b streaming** — chunk load/unload by camera, Worker greedy mesher, LOD, per-chunk
       IDB; then enable 1ft.
 - [ ] **S5 L5 materials** — QuickJS-wasm sandbox + per-type/time-bucket cache + presets.

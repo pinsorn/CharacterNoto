@@ -9,7 +9,7 @@
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { mapData, characters } from '../lib/stores.js';
   import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
-  import { voxelUI, voxelEnv } from '../lib/voxel/store.js';
+  import { voxelUI, voxelEnv, voxelObjUI } from '../lib/voxel/store.js';
   import { CHUNK, WORLD_HEIGHT, MAP_EXTENT, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
   import { createChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
@@ -19,6 +19,8 @@
   import { createTokenGroup, syncTokenGroup, SIZES } from './map3d/tokens.js';
   import EnvPanel from './map3d/EnvPanel.svelte';
   import { createEnvironment } from './map3d/environment.js';
+  import ObjectPanel from './map3d/ObjectPanel.svelte';
+  import { createObjectLayer, syncObjectLayer, scatterInstances } from './map3d/objects.js';
 
   const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
@@ -31,6 +33,9 @@
   let renderer, scene, camera, controls, raf;
   let terrainMesh, terrainMat, gridHelper, pickPlane, topTarget;
   let tokenGroup;
+  let objectLayer; // InstancedMesh group for scattered props
+  let objSeed = 1;
+  let lastScatterKey = null;
   let env; // environment system (sky/time/season/weather/fog)
   let envMinute = $state(720); // live clock when animated
   let lastT = 0;
@@ -58,6 +63,29 @@
   };
   function syncTokens() {
     if (tokenGroup) syncTokenGroup(tokenGroup, get(mapData).tokens || [], charLookup, heightAt, THREE);
+  }
+  function syncObjects() {
+    if (objectLayer) syncObjectLayer(objectLayer, get(mapData).objects || [], THREE);
+  }
+  function appendObjects(arr) {
+    if (!arr?.length) return;
+    mapData.update((d) => ({ ...d, objects: [...(d.objects || []), ...arr] }));
+  }
+  // Scatter brush / hand-place props on the terrain surface (objects mode).
+  function scatterOrPlace(hit, start) {
+    if (!hit) return;
+    const o = get(voxelObjUI);
+    const gx = clampCell(Math.floor(hit.point.x));
+    const gz = clampCell(Math.floor(hit.point.z));
+    if (o.mode === 'place') {
+      if (!start) return; // one per click
+      appendObjects([{ propId: o.propId, pos: { x: gx + 0.5, y: heightAt(gx, gz), z: gz + 0.5 }, yaw: o.yawRandom ? Math.random() * Math.PI * 2 : 0, scale: 1, seed: objSeed++ }]);
+      return;
+    }
+    const key = `${gx},${gz}`;
+    if (!start && key === lastScatterKey) return; // throttle: only when the cell changes
+    lastScatterKey = key;
+    appendObjects(scatterInstances(o.propId, gx, gz, { radius: o.radius, density: o.density, jitter: o.jitter, scaleVar: o.scaleVar, yawRandom: o.yawRandom }, heightAt, objSeed++));
   }
 
   const clampCell = (v) => Math.min(CHUNK - 1, Math.max(0, v));
@@ -144,6 +172,12 @@
       draggingTokenId = id;
       return;
     }
+    if (mode === 'objects') {
+      painting = true;
+      lastScatterKey = null;
+      scatterOrPlace(pick(e), true);
+      return;
+    }
     painting = true;
     strokeSeed++;
     applyAt(pick(e), true);
@@ -161,13 +195,16 @@
       if (hit) moveToken(draggingTokenId, clampCell(Math.floor(hit.point.x)), clampCell(Math.floor(hit.point.z)));
       return;
     }
-    if (painting) applyAt(pick(e), false);
+    if (!painting) return;
+    if (mode === 'objects') scatterOrPlace(pick(e), false);
+    else applyAt(pick(e), false);
   }
   function onPointerUp() {
     if (possessing) { look.dragging = false; return; }
     if (draggingTokenId) { draggingTokenId = null; scheduleTopview(); return; }
     if (!painting) return;
     painting = false;
+    if (mode === 'objects') { scheduleTopview(); return; }
     scheduleSave();
     scheduleTopview();
   }
@@ -329,6 +366,8 @@
 
     tokenGroup = createTokenGroup(THREE);
     scene.add(tokenGroup);
+    objectLayer = createObjectLayer(scene, THREE);
+    syncObjects();
 
     const dom = renderer.domElement;
     dom.style.touchAction = 'none';
@@ -394,6 +433,12 @@
     const e = $voxelEnv;
     if (env) env.apply(e);
   });
+
+  // Resync scattered props when the objects array changes.
+  $effect(() => {
+    const _ = $mapData.objects;
+    if (objectLayer) syncObjects();
+  });
 </script>
 
 <div>
@@ -402,6 +447,7 @@
     <div class="join">
       <button class="btn btn-xs join-item {mode === 'terrain' ? 'btn-active' : ''}" onclick={() => (mode = 'terrain')}>Terrain</button>
       <button class="btn btn-xs join-item {mode === 'tokens' ? 'btn-active' : ''}" onclick={() => (mode = 'tokens')}>Tokens</button>
+      <button class="btn btn-xs join-item {mode === 'objects' ? 'btn-active' : ''}" onclick={() => (mode = 'objects')}>Objects</button>
     </div>
     <div class="join">
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
@@ -468,6 +514,7 @@
   <div class="text-xs opacity-60 mb-2">
     {#if possessing}POV — drag to look · WASD/arrows to move · Esc to exit
     {:else if mode === 'tokens'}Tokens — click to select · drag to move · Q/E to rotate · Possess for first-person POV
+    {:else if mode === 'objects'}Objects — click/drag to scatter (or hand-place) props · pick prop & params below
     {:else}Left-drag = edit · Right-drag = orbit · Wheel = zoom · Middle-drag = pan. Edits auto-save & refresh the Map tab topview.{/if}
   </div>
 
@@ -485,5 +532,8 @@
 
   {#if mode === 'tokens'}
     <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} /></div>
+  {/if}
+  {#if mode === 'objects'}
+    <div class="mt-3"><ObjectPanel /></div>
   {/if}
 </div>

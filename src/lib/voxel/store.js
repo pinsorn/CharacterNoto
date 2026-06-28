@@ -4,9 +4,12 @@ import { persisted } from '../stores.js';
 
 export const voxelUI = persisted('voxelUI', {
   mapId: 'default',
-  tool: 'raise', // raise | lower | flatten | smooth | paintBiome | place | erase
+  tool: 'raise', // raise|lower|flatten|smooth|roughen|setHeight|carve|paintBiome | place|erase
   brushRadius: 2,
   brushStrength: 1,
+  brushShape: 'circle', // circle | square
+  brushFalloff: false,
+  targetHeight: 8, // for setHeight tool
   biomeId: 0,
   blockId: 1,
   cameraPreset: 'iso', // iso | top

@@ -36,8 +36,9 @@ before the next. Algorithmic pieces leave a runnable `*.test.mjs`.
       chunk; greedy mesher; raycast→cell→raise/lower/flatten/paintBiome/place/erase; IDB chunk
       store; topview→`mapData.backgroundId`; Map tab upload removed. `voxel.test.mjs`. **DONE,
       verified E2E in production preview.** *(overseer)*
-- [ ] **S1 L2 World Painter** — raise/lower/flatten/smooth/set/roughen + carve; biome paint;
-      water level; brush radius/strength/falloff/shape.
+- [x] **S1 L2 World Painter** — raise/lower/flatten/smooth/roughen/setHeight + carve; biome paint;
+      brush radius/strength/falloff/shape. **DONE** (`map3d/brushes.js` pure+tested, wired into
+      Map3DTab param-driven toolbar; verified E2E). Water level → deferred to S8.
 - [ ] **S2 L3 Tokens** — characters + generic; drag-drop snap to 5ft grid; facing; sizes;
       surface-snap; possession POV camera. Token state in `mapData` (syncs to viewers).
 - [ ] **S3 L4 Object system** — Object Builder (objectVoxelSizeFt) + prop library + Object
@@ -51,6 +52,32 @@ before the next. Algorithmic pieces leave a runnable `*.test.mjs`.
 - [ ] **S9 L9 destruction** — cannon-es debris for props + terrain carve → reflood/remesh.
 - [ ] **S10 L10 multi-map** — project/map browser, thumbnails, per-map env + saved view.
 - [ ] **S11 L11 optional** — STL export, .vox import, share links. (deferred unless time.)
+
+## Voxel core API (stable — subagents build against this; don't change signatures)
+`src/lib/voxel/types.js`: `CHUNK=32`, `WORLD_HEIGHT=64`, `MAP_EXTENT=32`, `BIOMES[]`,
+  `BLOCKS[]`, `surfaceKey(b)`, `subKey(b)`, `blockKey(t)`, `colorOf(key)->[r,g,b]`.
+`src/lib/voxel/world.js`: `createChunk(cx,cz,base,biomeId)`, `composeDense(ch)->Uint16` (dense
+  idx = `(y*CHUNK+z)*CHUNK+x`), `getHeight/getBiome(ch,x,z)`, `setColumnHeight`, `addHeight`,
+  `paintBiome`, `placeBlock(ch,x,y,z,blockId)`, `eraseVoxel(ch,x,y,z)`, `surfaceY(dense,x,z)`,
+  `inBounds(x,y,z)`. All edits set `ch.dirty=true`.
+`src/lib/voxel/mesher.js`: `greedyMesh([X,Y,Z], get(x,y,z)->key, colorOf)->{positions,normals,
+  colors,indices,quads}` (pure, Worker-safe).
+`src/lib/voxel/chunkStore.js`: `saveChunk(mapId,ch)`, `loadChunk(mapId,cx,cz)`, `deleteMapChunks`.
+`src/lib/voxel/store.js`: `voxelUI` (tool/brush/biome/block/mapId/cameraPreset), `voxelEnv`.
+`Map3DTab.svelte`: host. `chunk` (current), `rebuild()` (recompose+remesh), `scene`, `camera`,
+  `renderer`, `controls`, `terrainMesh`, `pick(e)->hit`, `scheduleSave/scheduleTopview`. World
+  coords == voxel coords (1 unit = 1 voxel); grid is `CHUNK` wide at origin.
+
+Integration rule: a subagent's feature lives in its own `src/components/map3d/<feature>.js`
+exporting a small init/update/dispose; the OVERSEER wires the few lines into Map3DTab + commits.
+
+## Notes / footguns
+- "crater" on raise was a visual (1-voxel mound, low contrast) — mesher verified correct, NOT a bug.
+- **S4 streaming**: topview must stay a FIXED bounded map area (MAP_EXTENT), not auto-expand to all
+  chunks, or regions desync. Defer S4 (refactor of proven core) + S5 QuickJS (wasm bundle bloat,
+  already 964 kB) — surface to user, don't open unattended.
+- Verification gate per slice: `npm run build` green + ALL `src/**/*.test.mjs` (dice, logic, loot,
+  publicview, voxel) green + preview E2E.
 
 ## File map (new)
 - `src/lib/voxel/types.js` — constants, factories, JSDoc schemas, MAP_EXTENT.

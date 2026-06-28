@@ -11,20 +11,17 @@
   import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
   import { voxelUI } from '../lib/voxel/store.js';
   import { CHUNK, WORLD_HEIGHT, MAP_EXTENT, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
-  import {
-    createChunk, composeDense, addHeight, setColumnHeight, paintBiome, placeBlock, eraseVoxel,
-  } from '../lib/voxel/world.js';
+  import { createChunk, composeDense, placeBlock, eraseVoxel } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
   import { saveChunk, loadChunk } from '../lib/voxel/chunkStore.js';
+  import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
 
-  const TOOLS = [
-    { id: 'raise', label: 'Raise' },
-    { id: 'lower', label: 'Lower' },
-    { id: 'flatten', label: 'Flatten' },
-    { id: 'paintBiome', label: 'Paint Biome' },
+  const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
     { id: 'erase', label: 'Erase' },
   ];
+  // Which extra controls the current tool exposes (radius|strength|shape|falloff|target|biome).
+  const toolParams = $derived(PAINTER_TOOLS.find((t) => t.id === $voxelUI.tool)?.params ?? []);
 
   let container;
   let renderer, scene, camera, controls, raf;
@@ -33,6 +30,7 @@
   let dirtyMesh = false;
   let painting = false;
   let strokeTargetH = 0;
+  let strokeSeed = 0; // stable jitter within a stroke, varies per stroke (for roughen)
   let saveTimer, topTimer;
   const ndc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
@@ -54,23 +52,6 @@
     else { terrainMesh = new THREE.Mesh(g, terrainMat); scene.add(terrainMesh); }
   }
 
-  function applyBrush(cx, cz) {
-    const ui = get(voxelUI);
-    const r = ui.brushRadius;
-    const s = ui.brushStrength;
-    for (let dz = -r; dz <= r; dz++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (dx * dx + dz * dz > r * r + r) continue; // disc
-        const x = cx + dx, z = cz + dz;
-        if (x < 0 || x >= CHUNK || z < 0 || z >= CHUNK) continue;
-        if (ui.tool === 'raise') addHeight(chunk, x, z, s);
-        else if (ui.tool === 'lower') addHeight(chunk, x, z, -s);
-        else if (ui.tool === 'flatten') setColumnHeight(chunk, x, z, strokeTargetH);
-        else if (ui.tool === 'paintBiome') paintBiome(chunk, x, z, ui.biomeId);
-      }
-    }
-  }
-
   function applyAt(hit, start) {
     if (!hit) return;
     const ui = get(voxelUI);
@@ -85,7 +66,12 @@
       const cx = clampCell(Math.floor(p.x - n.x * 0.01));
       const cz = clampCell(Math.floor(p.z - n.z * 0.01));
       if (start && ui.tool === 'flatten') strokeTargetH = chunk.height[colIdx(cx, cz)];
-      applyBrush(cx, cz);
+      paintBrush(chunk, cx, cz, {
+        tool: ui.tool, radius: ui.brushRadius, strength: ui.brushStrength,
+        shape: ui.brushShape, falloff: ui.brushFalloff, target: ui.targetHeight,
+        biomeId: ui.biomeId, seed: strokeSeed,
+        baseline: ui.tool === 'flatten' ? strokeTargetH : undefined,
+      });
     }
     dirtyMesh = true;
   }
@@ -101,6 +87,7 @@
   function onPointerDown(e) {
     if (e.button !== 0) return; // left = edit; right = orbit (OrbitControls)
     painting = true;
+    strokeSeed++;
     applyAt(pick(e), true);
   }
   function onPointerMove(e) {
@@ -275,12 +262,16 @@
 
   <!-- Tools -->
   <div class="flex flex-wrap gap-2 items-center mb-2">
-    <div class="join">
-      {#each TOOLS as t}
+    <div class="join flex-wrap">
+      {#each PAINTER_TOOLS as t}
+        <button class="btn btn-xs join-item {$voxelUI.tool === t.id ? 'btn-primary' : ''}" onclick={() => voxelUI.update((u) => ({ ...u, tool: t.id }))}>{t.label}</button>
+      {/each}
+      {#each BLOCK_TOOLS as t}
         <button class="btn btn-xs join-item {$voxelUI.tool === t.id ? 'btn-primary' : ''}" onclick={() => voxelUI.update((u) => ({ ...u, tool: t.id }))}>{t.label}</button>
       {/each}
     </div>
-    {#if $voxelUI.tool === 'paintBiome'}
+
+    {#if toolParams.includes('biome')}
       <select class="select select-xs select-bordered" value={$voxelUI.biomeId} onchange={(e) => voxelUI.update((u) => ({ ...u, biomeId: +e.target.value }))}>
         {#each BIOMES as b}<option value={b.id}>{b.name}</option>{/each}
       </select>
@@ -290,17 +281,33 @@
         {#each BLOCKS as b}<option value={b.id}>{b.name}</option>{/each}
       </select>
     {/if}
-    {#if $voxelUI.tool !== 'place' && $voxelUI.tool !== 'erase'}
+    {#if toolParams.includes('radius')}
       <label class="flex items-center gap-1 text-xs">Radius
-        <input type="range" min="0" max="6" class="range range-xs w-24" value={$voxelUI.brushRadius} oninput={(e) => voxelUI.update((u) => ({ ...u, brushRadius: +e.target.value }))} />
+        <input type="range" min="0" max="6" class="range range-xs w-20" value={$voxelUI.brushRadius} oninput={(e) => voxelUI.update((u) => ({ ...u, brushRadius: +e.target.value }))} />
         <span class="w-4">{$voxelUI.brushRadius}</span>
       </label>
-      {#if $voxelUI.tool === 'raise' || $voxelUI.tool === 'lower'}
-        <label class="flex items-center gap-1 text-xs">Strength
-          <input type="range" min="1" max="4" class="range range-xs w-20" value={$voxelUI.brushStrength} oninput={(e) => voxelUI.update((u) => ({ ...u, brushStrength: +e.target.value }))} />
-          <span class="w-4">{$voxelUI.brushStrength}</span>
-        </label>
-      {/if}
+    {/if}
+    {#if toolParams.includes('strength')}
+      <label class="flex items-center gap-1 text-xs">Strength
+        <input type="range" min="1" max="4" class="range range-xs w-16" value={$voxelUI.brushStrength} oninput={(e) => voxelUI.update((u) => ({ ...u, brushStrength: +e.target.value }))} />
+        <span class="w-4">{$voxelUI.brushStrength}</span>
+      </label>
+    {/if}
+    {#if toolParams.includes('target')}
+      <label class="flex items-center gap-1 text-xs">Height
+        <input type="range" min="0" max="40" class="range range-xs w-24" value={$voxelUI.targetHeight} oninput={(e) => voxelUI.update((u) => ({ ...u, targetHeight: +e.target.value }))} />
+        <span class="w-5">{$voxelUI.targetHeight}</span>
+      </label>
+    {/if}
+    {#if toolParams.includes('shape')}
+      <button class="btn btn-xs btn-ghost" title="Brush shape" onclick={() => voxelUI.update((u) => ({ ...u, brushShape: u.brushShape === 'circle' ? 'square' : 'circle' }))}>
+        {$voxelUI.brushShape === 'square' ? '■ square' : '● circle'}
+      </button>
+    {/if}
+    {#if toolParams.includes('falloff')}
+      <label class="flex items-center gap-1 text-xs cursor-pointer">
+        <input type="checkbox" class="checkbox checkbox-xs" checked={$voxelUI.brushFalloff} onchange={(e) => voxelUI.update((u) => ({ ...u, brushFalloff: e.target.checked }))} /> Falloff
+      </label>
     {/if}
   </div>
 

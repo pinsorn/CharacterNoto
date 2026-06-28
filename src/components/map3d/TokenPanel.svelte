@@ -7,7 +7,10 @@
   import { putBlob, delBlob, newImageId } from '../../lib/blobstore.js';
   import { formatFromName, SUPPORTED_MODEL_FORMATS } from './tokenModels.js';
 
-  let { selectedId = $bindable(null), onPossess } = $props();
+  let { selectedId = $bindable(null), onPossess, onLocate, getSpawnCell } = $props();
+
+  // New tokens spawn at the current view centre (so they're visible on huge maps), not a fixed corner.
+  const spawnCell = () => (getSpawnCell ? getSpawnCell() : { gx: 16, gz: 16 });
 
   const DEFAULT_COLOR = '#7c3aed';
   const R2D = 180 / Math.PI; // radians → degrees for the rotation inputs
@@ -34,7 +37,7 @@
   function addGeneric() {
     const tok = {
       id: crypto.randomUUID(), kind: 'marker', label: 'Marker',
-      color: nextColor(), size: 'medium', cell: { gx: 16, gz: 16 }, facing: 0,
+      color: nextColor(), size: 'medium', cell: spawnCell(), facing: 0,
     };
     setTokens([...tokens, tok]);
     selectedId = tok.id;
@@ -46,7 +49,7 @@
     const tok = {
       id: crypto.randomUUID(), kind: 'creature', charId: char.id,
       label: char.name, color: char.color || nextColor(),
-      size: 'medium', cell: { gx: 16, gz: 16 }, facing: 0,
+      size: 'medium', cell: spawnCell(), facing: 0,
     };
     setTokens([...tokens, tok]);
     selectedId = tok.id;
@@ -117,6 +120,10 @@
           <span class="inline-block w-3 h-3 rounded-full shrink-0" style={`background:${t.color}`}></span>
           <span class="text-sm truncate mr-auto">{t.label}</span>
           <span class="badge badge-ghost badge-xs">{t.size}</span>
+          {#if onLocate}
+            <button class="btn btn-ghost btn-xs px-1" title="Center the 3D view on this token" aria-label="Locate"
+              onclick={(e) => { e.stopPropagation(); selectedId = t.id; onLocate(t); }}>🎯</button>
+          {/if}
         </div>
       {/each}
     </div>
@@ -188,6 +195,19 @@
           <span class="truncate max-w-[10rem]" title={selected.modelName}>{selected.modelName || selected.modelFormat}</span>
           <button class="btn btn-xs btn-ghost" onclick={clearModel}>Clear</button>
         {/if}
+      </div>
+
+      <div class="flex items-center gap-1 text-xs flex-wrap">
+        <span class="opacity-60">Position</span>
+        <label class="flex items-center gap-1">X
+          <input type="number" class="input input-xs input-bordered w-20" value={selected.cell?.gx ?? 0}
+            oninput={(e) => patch(selected.id, { cell: { ...selected.cell, gx: Math.round(+e.target.value) } })} />
+        </label>
+        <label class="flex items-center gap-1">Z
+          <input type="number" class="input input-xs input-bordered w-20" value={selected.cell?.gz ?? 0}
+            oninput={(e) => patch(selected.id, { cell: { ...selected.cell, gz: Math.round(+e.target.value) } })} />
+        </label>
+        {#if onLocate}<button class="btn btn-xs" onclick={() => onLocate(selected)}>🎯 Go to</button>{/if}
       </div>
 
       <label class="flex items-center gap-1 text-xs">Height

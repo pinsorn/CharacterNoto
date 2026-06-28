@@ -196,6 +196,23 @@
   function moveToken(id, gx, gz) {
     mapData.update((d) => ({ ...d, tokens: (d.tokens || []).map((t) => (t.id === id ? { ...t, cell: { gx, gz } } : t)) }));
   }
+  // New tokens spawn at the current orbit-target cell (visible on huge maps), clamped to the map.
+  function tokenSpawnCell() {
+    const t = controls?.target, ext = mapExtentVox();
+    const c = (v) => Math.min(ext - 1, Math.max(0, Math.round(v)));
+    return t ? { gx: c(t.x), gz: c(t.z) } : { gx: 16, gz: 16 };
+  }
+  // Center the 3D view on a token so it's easy to find on a large map (streams that area too).
+  function locateToken(t) {
+    if (!t?.cell || !camera || !controls) return;
+    selectedTokenId = t.id;
+    const gx = t.cell.gx, gz = t.cell.gz;
+    const d = manager ? CHUNK_DIM * 2.0 : Math.max(12, chunk.size * 0.45);
+    controls.target.set(gx + 0.5, 0, gz + 0.5);
+    camera.position.set(gx + 0.5 + d, d, gz + 0.5 + d);
+    controls.update();
+    if (manager) { manager.setView(gx + 0.5, gz + 0.5, VIEW_RADIUS); setTimeout(syncTokens, 400); } // stream + re-snap height
+  }
   function rotateSelected(delta) {
     if (!selectedTokenId) return;
     mapData.update((d) => ({ ...d, tokens: (d.tokens || []).map((t) => (t.id === selectedTokenId ? { ...t, facing: (t.facing || 0) + delta } : t)) }));
@@ -213,8 +230,11 @@
     if (e.button !== 0) return; // left = act; right = orbit (OrbitControls)
     if (mode === 'tokens') {
       const id = pickToken(e);
-      selectedTokenId = id;
-      draggingTokenId = id;
+      if (id) { selectedTokenId = id; draggingTokenId = id; }       // clicked a token → select + drag
+      else if (selectedTokenId) {                                   // clicked ground with one selected → move it there
+        const hit = pick(e);
+        if (hit) moveToken(selectedTokenId, clampCell(Math.floor(hit.point.x)), clampCell(Math.floor(hit.point.z)));
+      }
       return;
     }
     if (mode === 'objects') {
@@ -486,6 +506,9 @@
     const dom = renderer.domElement;
     dom.style.touchAction = 'none';
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Middle button = OrbitControls pan; stop the browser's middle-click autoscroll (page scroll).
+    dom.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+    dom.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
     dom.addEventListener('pointerdown', onPointerDown);
     dom.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
@@ -675,7 +698,7 @@
 
   <div class="text-xs opacity-60 mb-2">
     {#if possessing}POV — drag to look · WASD/arrows to move · Esc to exit
-    {:else if mode === 'tokens'}Tokens — click to select · drag to move · Q/E to rotate · Possess for first-person POV
+    {:else if mode === 'tokens'}Tokens — click to select · drag OR click ground to move · type X/Z or 🎯 to locate · Q/E rotate · Possess for POV
     {:else if mode === 'objects'}Objects — click/drag to scatter (or hand-place) props · pick prop & params below
     {:else}Left-drag = edit · Right-drag = orbit · Wheel = zoom · Middle-drag = pan. Edits auto-save & refresh the Map tab topview.{/if}
   </div>
@@ -704,7 +727,7 @@
     </details>
   {/if}
   {#if mode === 'tokens'}
-    <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} /></div>
+    <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} onLocate={locateToken} getSpawnCell={tokenSpawnCell} /></div>
   {/if}
   {#if mode === 'objects'}
     <div class="mt-3"><ObjectPanel /></div>

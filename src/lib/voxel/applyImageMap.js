@@ -62,7 +62,14 @@ async function generateChunked({ N, R, layers, imgs }) {
       if (layers.object.on && objects.length < MAX_OBJECTS) {
         const o = chunkFromImage(imgs.object, cx, cz, DIM, R, { height: { on: false }, biome: { on: false }, object: { on: true, density: layers.object.density } }).objects;
         let placed = 0;
-        for (const inst of o) { if (placed >= perChunkObjects || objects.length >= MAX_OBJECTS) break; objects.push(inst); placed++; }
+        for (const inst of o) {
+          if (placed >= perChunkObjects || objects.length >= MAX_OBJECTS) break;
+          // the object pass runs height-off (y defaults to 1) — sit each prop on THIS chunk's terrain
+          // surface so it isn't buried. local cell from the instance's global position.
+          const lx = Math.floor(inst.pos.x) - cx * DIM, lz = Math.floor(inst.pos.z) - cz * DIM;
+          if (lx >= 0 && lx < DIM && lz >= 0 && lz < DIM) inst.pos.y = height[lz * DIM + lx];
+          objects.push(inst); placed++;
+        }
       }
       await saveChunk(mapId, { cx, cz, height, biome, overrides: new Map(), carves: new Set() });
 

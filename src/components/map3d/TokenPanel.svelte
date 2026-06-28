@@ -8,6 +8,9 @@
   let { selectedId = $bindable(null), onPossess } = $props();
 
   const DEFAULT_COLOR = '#7c3aed';
+  const R2D = 180 / Math.PI; // radians → degrees for the rotation inputs
+  const deg = (rad) => Math.round((rad || 0) * R2D);
+  const rad = (d) => (Number(d) || 0) / R2D;
   // App palette (matches MapTab's daisy colours) for quick colour picks.
   const SWATCHES = ['#7c3aed', '#db2777', '#06b6d4', '#3abff8', '#36d399', '#fbbd23', '#f87272', '#64748b'];
   const SIZE_KEYS = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
@@ -133,8 +136,24 @@
           {#each SIZE_KEYS as s}<option value={s}>{s}</option>{/each}
         </select>
 
-        <button class="btn btn-xs btn-ghost" title="Rotate left" onclick={() => rotate(selected.id, -Math.PI / 4)}>⟲</button>
-        <button class="btn btn-xs btn-ghost" title="Rotate right" onclick={() => rotate(selected.id, Math.PI / 4)}>⟳</button>
+        <button class="btn btn-xs btn-ghost" title="Rotate facing left" onclick={() => rotate(selected.id, -Math.PI / 4)}>⟲</button>
+        <button class="btn btn-xs btn-ghost" title="Rotate facing right" onclick={() => rotate(selected.id, Math.PI / 4)}>⟳</button>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap text-xs">
+        <span class="opacity-60">Rotation°</span>
+        <label class="flex items-center gap-1">X
+          <input type="number" step="15" class="input input-xs input-bordered w-16" value={deg(selected.pitch)}
+            oninput={(e) => patch(selected.id, { pitch: rad(e.target.value) })} />
+        </label>
+        <label class="flex items-center gap-1">Y
+          <input type="number" step="15" class="input input-xs input-bordered w-16" value={deg(selected.facing)}
+            oninput={(e) => patch(selected.id, { facing: rad(e.target.value) })} />
+        </label>
+        <label class="flex items-center gap-1">Z
+          <input type="number" step="15" class="input input-xs input-bordered w-16" value={deg(selected.roll)}
+            oninput={(e) => patch(selected.id, { roll: rad(e.target.value) })} />
+        </label>
       </div>
 
       <label class="flex items-center gap-1 text-xs">Height

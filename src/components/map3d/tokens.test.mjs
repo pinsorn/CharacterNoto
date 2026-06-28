@@ -23,7 +23,7 @@ class Object3D {
   constructor() {
     this.children = [];
     this.position = vec();
-    this.rotation = {};
+    this.rotation = vec(); // has .set(x,y,z) for 3-axis token rotation
     this.scale = vec();
     this.userData = {};
   }

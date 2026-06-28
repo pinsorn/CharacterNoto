@@ -126,7 +126,8 @@ function updateToken(THREE, grp, token, charLookup, heightAt) {
   const gz = token.cell?.gz ?? 0;
   const baseY = token.heightOverride != null ? token.heightOverride : heightAt(gx, gz);
   grp.position.set(gx + 0.5, baseY, gz + 0.5);
-  grp.rotation.y = token.facing || 0;
+  // facing = yaw (Y); optional pitch (X) / roll (Z) for tilted / flying tokens. Radians.
+  grp.rotation.set(token.pitch || 0, token.facing || 0, token.roll || 0);
 
   base.scale.set(foot, 1, foot);
   base.position.set(0, 0.04, 0);

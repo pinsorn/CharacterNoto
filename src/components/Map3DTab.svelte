@@ -164,8 +164,14 @@
   }
 
   function onPointerDown(e) {
+    if (possessing) {
+      // POV: look with EITHER left or right drag (right matches build-mode orbit muscle memory).
+      if (e.button !== 0 && e.button !== 2) return;
+      look.dragging = true; look.px = e.clientX; look.py = e.clientY;
+      try { renderer.domElement.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      return;
+    }
     if (e.button !== 0) return; // left = act; right = orbit (OrbitControls)
-    if (possessing) { look.dragging = true; look.px = e.clientX; look.py = e.clientY; return; }
     if (mode === 'tokens') {
       const id = pickToken(e);
       selectedTokenId = id;
@@ -199,8 +205,8 @@
     if (mode === 'objects') scatterOrPlace(pick(e), false);
     else applyAt(pick(e), false);
   }
-  function onPointerUp() {
-    if (possessing) { look.dragging = false; return; }
+  function onPointerUp(e) {
+    if (possessing) { look.dragging = false; try { renderer.domElement.releasePointerCapture(e.pointerId); } catch { /* ignore */ } return; }
     if (draggingTokenId) { draggingTokenId = null; scheduleTopview(); return; }
     if (!painting) return;
     painting = false;
@@ -232,7 +238,8 @@
     keys.clear();
     controls.enabled = true;
     if (camera) { camera.fov = 50; camera.updateProjectionMatrix(); }
-    syncTokens(); // restores hidden pawn visibility
+    tokenGroup?.children.forEach((c) => (c.visible = true)); // un-hide the possessed pawn
+    syncTokens();
     setPreset(get(voxelUI).cameraPreset);
   }
   function applyLook() {

@@ -85,6 +85,11 @@ exporting a small init/update/dispose; the OVERSEER wires the few lines into Map
   already 964 kB) — surface to user, don't open unattended.
 - Verification gate per slice: `npm run build` green + ALL `src/**/*.test.mjs` (dice, logic, loot,
   publicview, voxel) green + preview E2E.
+- KNOWN COST: Map3DTab (like DiceScene) mounts even while its tab is hidden → a host runs a 2nd
+  always-on WebGL context + rAF loop. Acceptable now; gate the renderer/loop on first reveal if
+  perf complaints surface.
+- Viewer/player path: tokens+objects added to publicview (unit-tested, additive); players see them
+  baked into the topview PNG. Not re-E2E'd live this milestone.
 
 ## File map (new)
 - `src/lib/voxel/types.js` — constants, factories, JSDoc schemas, MAP_EXTENT.

@@ -100,8 +100,11 @@
   // --- target size N ----------------------------------------------------------
   // N = clamp(round(max(W,H)/R), 8, MAX_MAP_SIZE). DM picks R; we display the resulting map size.
   let rawN = $derived(baseImg ? Math.round(Math.max(baseImg.width, baseImg.height) / R) : 0);
-  let N = $derived(baseImg ? Math.max(8, Math.min(MAX_MAP_SIZE, rawN)) : 0);
-  let capped = $derived(rawN > MAX_MAP_SIZE);
+  // True map size is UNLIMITED now. N>MAX_MAP_SIZE → generated as streamed chunks (top-down view).
+  let N = $derived(baseImg ? Math.max(8, rawN) : 0);
+  let big = $derived(N > MAX_MAP_SIZE); // chunked (large) map
+  // Previews + derived arrays are bounded so a huge N doesn't compute 25M cells on the main thread.
+  let previewN = $derived(Math.min(N, MAX_MAP_SIZE));
 
   // Effective source per layer = its override (if uploaded) else the base image.
   let heightSrc = $derived(heightImg || baseImg);
@@ -112,13 +115,13 @@
   // Comment/shortcut: each helper re-runs sampleResize internally, so a param tweak rescans the
   // source image. We lean on N≤256 + per-File decode caching rather than caching the resized RGB
   // (which would duplicate lib logic) — fine for DM-scale images.
-  let heights = $derived(heightEnabled && heightSrc && N ? imageToHeights(heightSrc, N, { maxHeight, invert }) : null);
-  let biomes = $derived(biomeEnabled && biomeSrc && N ? imageToBiomes(biomeSrc, N) : null);
+  let heights = $derived(heightEnabled && heightSrc && previewN ? imageToHeights(heightSrc, previewN, { maxHeight, invert }) : null);
+  let biomes = $derived(biomeEnabled && biomeSrc && previewN ? imageToBiomes(biomeSrc, previewN) : null);
   let objects = $derived.by(() => {
-    if (!objectEnabled || !objectSrc || !N) return [];
+    if (!objectEnabled || !objectSrc || !previewN) return [];
     // heightAt: use the live heights array when the Height layer is on, else flat 1 (spec).
-    const heightAt = (gx, gz) => (heights ? heights[gz * N + gx] : 1);
-    return imageToObjects(objectSrc, N, { propId, threshold, density, heightAt });
+    const heightAt = (gx, gz) => (heights ? heights[gz * previewN + gx] : 1);
+    return imageToObjects(objectSrc, previewN, { propId, threshold, density, heightAt });
   });
 
   // --- preview canvases -------------------------------------------------------
@@ -143,7 +146,7 @@
 
   // Redraw all four previews whenever the derived data / params change.
   $effect(() => {
-    const n = N;
+    const n = previewN;
     if (!baseImg || !n) return;
     const hArr = heights, bArr = biomes, objs = objects, mh = maxHeight;
     // object cells (gx,gz from pos.x-0.5 / pos.z-0.5 → floor of pos)
@@ -180,14 +183,34 @@
   });
 
   // --- apply ------------------------------------------------------------------
-  function apply() {
-    if (!baseImg || !onApply || !N) return;
-    const size = N;
-    const height = heights ? heights : new Int16Array(size * size).fill(BASE_HEIGHT); // disabled → flat base
-    const biome = biomes ? biomes : new Uint8Array(size * size); // disabled → all biome 0
-    onApply({ size, height, biome, objects }); // objects is already [] when disabled
-    applied = true;
-    setTimeout(() => { applied = false; }, 1600);
+  let applying = $state(false);
+  async function apply() {
+    if (!baseImg || !onApply || !N || applying) return;
+    applying = true;
+    try {
+      if (big) {
+        // LARGE: hand raw images + config to the overseer, which streams chunks (no whole-map array).
+        await onApply({
+          chunked: true, N, R,
+          layers: {
+            height: { on: heightEnabled, maxHeight, invert, base: BASE_HEIGHT },
+            biome: { on: biomeEnabled },
+            object: { on: objectEnabled, propId, threshold, density },
+          },
+          imgs: { height: heightSrc, biome: biomeSrc, object: objectSrc },
+        });
+      } else {
+        // SMALL: previewN === N, so the derived arrays are the full map → single chunk (3D editable).
+        const size = N;
+        const height = heights ? heights : new Int16Array(size * size).fill(BASE_HEIGHT);
+        const biome = biomes ? biomes : new Uint8Array(size * size);
+        await onApply({ size, height, biome, objects });
+      }
+      applied = true;
+      setTimeout(() => { applied = false; }, 1600);
+    } finally {
+      applying = false;
+    }
   }
 </script>
 
@@ -201,8 +224,8 @@
     <button type="button" class="btn btn-sm btn-ghost" onclick={() => (fullscreen = !fullscreen)}>
       {fullscreen ? '⤡ Exit' : '⤢ Full screen'}
     </button>
-    <button type="button" class="btn btn-sm btn-primary" disabled={!baseImg} onclick={apply}>
-      {applied ? 'Applied ✓' : 'Apply'}
+    <button type="button" class="btn btn-sm btn-primary" disabled={!baseImg || applying} onclick={apply}>
+      {applying ? (big ? 'Generating…' : 'Applying…') : applied ? 'Applied ✓' : big ? 'Generate' : 'Apply'}
     </button>
   </div>
 
@@ -226,8 +249,8 @@
         {#if baseImg}
           <div class="text-xs opacity-70">
             Source {baseImg.width}×{baseImg.height}px → <span class="font-semibold">{N}×{N} map</span>
-            {#if capped}
-              <div class="text-warning mt-1">capped at {MAX_MAP_SIZE} (larger maps need the streaming engine — roadmap)</div>
+            {#if big}
+              <div class="text-info mt-1">large map → auto-split into {Math.ceil(N / 64)}×{Math.ceil(N / 64)} chunks. Top-down view shows on the Map tab (full 3D streaming view coming).</div>
             {/if}
           </div>
         {/if}

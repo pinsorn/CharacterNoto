@@ -95,6 +95,42 @@ multiplayer streaming of chunks. Keep cosmetic POV, regions, tokens, objects wor
   shipped v3.10.0 until P2 is verified. If interrupted, this spec + the branch's last green commit are
   the resume point.
 
+## STATUS (2026-06-28) — P1 SAFE HALF DONE; spine deferred
+**Done on branch `feat/streaming-engine` (NOT merged; main = v3.10.0):**
+- Pure modules (all unit-tested): `chunkGrid`, `tileMesher`+`meshWorker`, `imageChunker`, `topoRaster`;
+  `chunkStore` meta (`saveMeta/loadMeta/allChunkKeys`); `CHUNK_DIM=64`.
+- **Unlimited Image Editor generate → chunks** (`applyImageMap.js` `generateChunked`): streams chunks
+  to IDB via `imageChunker`, incremental top-down raster → `mapData.backgroundId`, `saveMeta`, objects
+  capped at 20000, `mapRev++`. ≤256 still single-chunk (3D-editable, unchanged). Map3DTab shows a
+  "Large chunked map" note for chunked maps. **Verified E2E: 640×640 → 100 chunks, topview on Map tab.**
+
+## HANDOFF — the deferred spine (streaming RENDER in Map3DTab) + P2
+Resume here. Build a `ChunkManager` (overseer-owned) and reroute Map3DTab off the single-chunk model.
+**Parity at one chunk FIRST** (must render/edit/topview identically at small size) before load/unload.
+
+`ChunkManager(scene, THREE, mapId)` interface (so call sites barely change):
+`heightAt(gx,gz)`, `editAtWorld(worldX,worldZ,fn)`, `raycastTargets()->Mesh[]`, `meshFor(cx,cz)`,
+`setView(centerX,centerZ,radiusChunks)` (load/unload), `save()`, `dispose()`. Uses `meshWorker`
+(1 worker + job queue, coalesce dirty/frame), apron from neighbor chunk heights, mesh world-offset to
+`(cx*DIM,0,cz*DIM)`.
+
+**Single-chunk assumptions to reroute (miss one → silent break):**
+- `brushes.js` writes `chunk.height` bounded by `chunk.size` → must route an edit to the right chunk(s)
+  + mark them (and apron-neighbors) dirty.
+- `heightAt`/`surfaceY` read `lastDense` (one chunk) → read across loaded chunks.
+- `applyImageMap` single path writes one chunk → fine; chunked path already correct.
+- raycast vs one `terrainMesh` → raycast `manager.raycastTargets()`.
+- topview: small=3D snapshot, large=raster — unify on raster (already scales).
+- token/object surface-snap + placement read one chunk → read via manager.
+
+**Render footguns (unit tests can't catch — verify visually):**
+- Chunk mesh MUST be world-offset to `(cx*DIM,0,cz*DIM)`.
+- Apron orientation (px indexed by z, pz by x) — screenshot 2+ adjacent chunks: no cracks, no double walls.
+- Objects: per-5000² density explodes; keep the 20000 cap or store/instances per loaded chunk.
+
+**P2:** camera-target radius load/unload (`chunksInRadius`) + recenter to pan huge maps + LOD-lite (far
+chunks surface-only/skip). Verify a ~5000² map pans + stays responsive. Don't merge until P2 E2E-verified.
+
 ## Subagent plan (coupled core — overseer owns the streaming loop)
 - Subagent(s), disjoint NEW pure modules + tests: (1) `chunkGrid.js`, (2) `tileMesher.js` +
   `meshWorker.js`, (3) `imageChunker.js`, (4) `topoRaster.js`. Run in parallel (no shared files).

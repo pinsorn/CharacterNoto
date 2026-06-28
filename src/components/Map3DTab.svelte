@@ -13,7 +13,7 @@
   import { CHUNK, WORLD_HEIGHT, MAP_SIZES, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
   import { createChunk, resizeChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
-  import { saveChunk, loadChunk } from '../lib/voxel/chunkStore.js';
+  import { saveChunk, loadChunk, loadMeta } from '../lib/voxel/chunkStore.js';
   import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
   import TokenPanel from './map3d/TokenPanel.svelte';
   import { createTokenGroup, syncTokenGroup, SIZES } from './map3d/tokens.js';
@@ -43,6 +43,7 @@
   let objSeed = 1;
   let lastScatterKey = null;
   let lastRev = 0; // tracks voxelUI.mapRev to reload when the Image Editor rewrites the map
+  let bigMap = $state(false); // chunked map (> single-chunk size): 3D streaming render is a later phase
   let env; // environment system (sky/time/season/weather/fog)
   let envMinute = $state(720); // live clock when animated
   let lastT = 0;
@@ -447,13 +448,17 @@
 
     // Load persisted chunk (or start flat), then build + initial topview.
     lastRev = get(voxelUI).mapRev || 0; // baseline so the reload effect only fires on real bumps
-    loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
-      chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
-      buildGrid(); // size may differ from the initial default
-      rebuild();
-      setPreset(get(voxelUI).cameraPreset);
-      renderer.render(scene, camera);
-      if (!get(mapData).backgroundId) renderTopview();
+    loadMeta(get(voxelUI).mapId).then((meta) => {
+      bigMap = !!(meta && (meta.wChunks > 1 || meta.hChunks > 1));
+      if (bigMap) { renderer.render(scene, camera); return; } // chunked map → see the Map tab topview
+      loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
+        chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
+        buildGrid(); // size may differ from the initial default
+        rebuild();
+        setPreset(get(voxelUI).cameraPreset);
+        renderer.render(scene, camera);
+        if (!get(mapData).backgroundId) renderTopview();
+      });
     });
 
     lastT = performance.now();
@@ -525,13 +530,20 @@
     const rev = $voxelUI.mapRev;
     if (!renderer || rev === lastRev) return;
     lastRev = rev;
-    loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
-      if (!loaded) return;
-      chunk = loaded;
-      buildGrid();
-      rebuild();
-      setPreset(get(voxelUI).cameraPreset);
-      scheduleTopview();
+    loadMeta(get(voxelUI).mapId).then((meta) => {
+      bigMap = !!(meta && (meta.wChunks > 1 || meta.hChunks > 1));
+      if (bigMap) { // chunked map: drop the single-chunk mesh, show the note; topview is on the Map tab
+        if (terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh = null; }
+        return;
+      }
+      loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
+        if (!loaded) return;
+        chunk = loaded;
+        buildGrid();
+        rebuild();
+        setPreset(get(voxelUI).cameraPreset);
+        scheduleTopview();
+      });
     });
   });
 </script>
@@ -622,6 +634,15 @@
     <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style="height: 460px;"></div>
     {#if possessing}
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
+    {/if}
+    {#if bigMap}
+      <div class="absolute inset-0 flex items-center justify-center text-center bg-base-300/80 px-6">
+        <div class="max-w-md text-sm opacity-80">
+          <div class="text-base font-semibold mb-1">Large chunked map</div>
+          This map was generated as streamed chunks. Its top-down view is on the <strong>Map</strong> tab.
+          The full 3D streaming render is the next engine phase.
+        </div>
+      </div>
     {/if}
   </div>
 

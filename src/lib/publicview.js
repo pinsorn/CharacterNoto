@@ -20,7 +20,7 @@ export function buildPublicView(state, share, hides = {}) {
   if (share.crafting) v.craftingRecipes = keep(state.craftingRecipes);
   if (share.map) {
     const md = state.mapData || {};
-    v.mapData = { backgroundId: md.backgroundId ?? null, regions: keep(md.regions) };
+    v.mapData = { backgroundId: md.backgroundId ?? null, regions: keep(md.regions), tokens: keep(md.tokens) };
   }
   if (share.relationships) {
     const r = state.relationships || {};
@@ -69,7 +69,7 @@ export async function applySnapshot(snap) {
   badges.set(s.characters ? v.badges || [] : []);
   itemDatabase.set(s.items ? v.itemDatabase || [] : []);
   craftingRecipes.set(s.crafting ? v.craftingRecipes || [] : []);
-  mapData.set(s.map ? v.mapData || { backgroundId: null, regions: [] } : { backgroundId: null, regions: [] });
+  mapData.set(s.map ? v.mapData || { backgroundId: null, regions: [], tokens: [] } : { backgroundId: null, regions: [], tokens: [] });
   relationships.set(s.relationships ? v.relationships || { axes: [], edges: [], positions: {} } : { axes: [], edges: [], positions: {} });
   diceSet.set(s.dice ? v.diceSet || [] : []);
   for (const [id, dataUrl] of Object.entries(snap.images || {})) {

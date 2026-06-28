@@ -39,8 +39,10 @@ before the next. Algorithmic pieces leave a runnable `*.test.mjs`.
 - [x] **S1 L2 World Painter** — raise/lower/flatten/smooth/roughen/setHeight + carve; biome paint;
       brush radius/strength/falloff/shape. **DONE** (`map3d/brushes.js` pure+tested, wired into
       Map3DTab param-driven toolbar; verified E2E). Water level → deferred to S8.
-- [ ] **S2 L3 Tokens** — characters + generic; drag-drop snap to 5ft grid; facing; sizes;
-      surface-snap; possession POV camera. Token state in `mapData` (syncs to viewers).
+- [x] **S2 L3 Tokens** — characters + generic; drag-drop snap to grid; facing (Q/E); sizes;
+      surface-snap; possession POV (drag-look + WASD, Esc). `map3d/tokens.js` (mesh, tested) +
+      `TokenPanel.svelte`; tokens in `mapData` (P2P + zip via publicview); bake into topview so
+      players see them on the Map tab. **DONE, verified E2E.** Imported-mesh/voxel-figure tokens → S3.
 - [ ] **S3 L4 Object system** — Object Builder (objectVoxelSizeFt) + prop library + Object
       Painter (scatter + hand-place), InstancedMesh per prop.
 - [ ] **S4 L1b streaming** — chunk load/unload by camera, Worker greedy mesher, LOD, per-chunk

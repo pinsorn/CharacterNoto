@@ -53,7 +53,9 @@ export const badges = persisted('badgeData', []);
 export const itemDatabase = persisted('itemDatabase', []);
 export const craftingRecipes = persisted('craftingRecipes', []);
 // Map feature: regions + the IndexedDB id of the background image (image bytes live in blobstore).
-export const mapData = persisted('mapData', { backgroundId: null, regions: [] });
+// `tokens` are 3D-map markers (creatures/objects) placed on the voxel grid; they also bake into
+// the top-down view so players see who/what is where on the Map tab.
+export const mapData = persisted('mapData', { backgroundId: null, regions: [], tokens: [] });
 // Character relationship graph: DM-defined axes (global), directed edges with per-axis values
 // + labels, and saved node positions (by character id).
 export const relationships = persisted('relationships', { axes: [], edges: [], positions: {} });

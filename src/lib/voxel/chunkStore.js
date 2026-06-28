@@ -44,5 +44,30 @@ export async function loadChunk(mapId, cx, cz) {
 export async function deleteMapChunks(mapId) {
   const s = await tx('readwrite');
   const keys = await wrap(s.getAllKeys());
-  await Promise.all(keys.filter((k) => String(k).startsWith(`${mapId}/`)).map((k) => wrap(s.delete(k))));
+  await Promise.all(
+    keys.filter((k) => String(k).startsWith(`${mapId}/`) || String(k) === metaKey(mapId)).map((k) => wrap(s.delete(k))),
+  );
+}
+
+// --- map index (streaming engine): chunk-grid extent + name, keyed separately from chunks ---
+const metaKey = (mapId) => `meta/${mapId}`;
+
+export async function saveMeta(mapId, meta) {
+  const s = await tx('readwrite');
+  await wrap(s.put({ ...meta, mapId }, metaKey(mapId)));
+}
+export async function loadMeta(mapId) {
+  const s = await tx('readonly');
+  return (await wrap(s.get(metaKey(mapId)))) ?? null;
+}
+
+/** All chunk keys for a map as [{cx,cz}] (excludes the meta record). */
+export async function allChunkKeys(mapId) {
+  const s = await tx('readonly');
+  const keys = await wrap(s.getAllKeys());
+  const prefix = `${mapId}/`;
+  return keys
+    .filter((k) => String(k).startsWith(prefix))
+    .map((k) => String(k).slice(prefix.length).split(',').map(Number))
+    .map(([cx, cz]) => ({ cx, cz }));
 }

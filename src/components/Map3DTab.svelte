@@ -9,7 +9,7 @@
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { mapData, characters } from '../lib/stores.js';
   import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
-  import { voxelUI } from '../lib/voxel/store.js';
+  import { voxelUI, voxelEnv } from '../lib/voxel/store.js';
   import { CHUNK, WORLD_HEIGHT, MAP_EXTENT, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
   import { createChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
@@ -17,6 +17,8 @@
   import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
   import TokenPanel from './map3d/TokenPanel.svelte';
   import { createTokenGroup, syncTokenGroup, SIZES } from './map3d/tokens.js';
+  import EnvPanel from './map3d/EnvPanel.svelte';
+  import { createEnvironment } from './map3d/environment.js';
 
   const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
@@ -29,6 +31,9 @@
   let renderer, scene, camera, controls, raf;
   let terrainMesh, terrainMat, gridHelper, pickPlane, topTarget;
   let tokenGroup;
+  let env; // environment system (sky/time/season/weather/fog)
+  let envMinute = $state(720); // live clock when animated
+  let lastT = 0;
   let lastDense = null; // cached for token surface-snap + remesh-driven re-place
   let chunk = createChunk();
   let dirtyMesh = false;
@@ -304,11 +309,9 @@
     controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     controls.maxPolarAngle = Math.PI * 0.495;
 
-    scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x3a2f25, 0.7));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const sun = new THREE.DirectionalLight(0xfff3d6, 1.1);
-    sun.position.set(CHUNK * 0.6, CHUNK * 1.4, CHUNK * 0.3);
-    scene.add(sun);
+    // Environment owns all lights + sky + fog (time/season/weather driven).
+    env = createEnvironment(scene, THREE);
+    env.apply(get(voxelEnv));
 
     terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
 
@@ -345,10 +348,14 @@
       if (!get(mapData).backgroundId) renderTopview();
     });
 
-    const tick = () => {
+    lastT = performance.now();
+    const tick = (now) => {
       raf = requestAnimationFrame(tick);
+      const dt = Math.min(0.1, ((now || performance.now()) - lastT) / 1000);
+      lastT = now || performance.now();
       if (possessing) applyLook();
       else controls.update();
+      if (env) envMinute = env.update(dt, get(voxelEnv)).minuteOfDay;
       if (dirtyMesh) { rebuild(); dirtyMesh = false; }
       renderer.render(scene, camera);
     };
@@ -371,6 +378,7 @@
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     container?._cleanup?.();
+    env?.dispose();
     topTarget?.dispose();
     renderer?.dispose();
   });
@@ -379,6 +387,12 @@
   $effect(() => {
     const _ = $mapData.tokens;
     if (tokenGroup) syncTokens();
+  });
+
+  // Re-apply environment when its settings change (panel edits).
+  $effect(() => {
+    const e = $voxelEnv;
+    if (env) env.apply(e);
   });
 </script>
 
@@ -463,6 +477,11 @@
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
     {/if}
   </div>
+
+  <details class="collapse collapse-arrow bg-base-200 rounded mt-3">
+    <summary class="collapse-title text-sm font-semibold py-2 min-h-0">Environment (time · season · weather · fog)</summary>
+    <div class="collapse-content"><EnvPanel minuteLabel={envMinute} /></div>
+  </details>
 
   {#if mode === 'tokens'}
     <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} /></div>

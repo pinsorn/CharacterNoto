@@ -48,7 +48,10 @@ before the next. Algorithmic pieces leave a runnable `*.test.mjs`.
 - [ ] **S4 L1b streaming** — chunk load/unload by camera, Worker greedy mesher, LOD, per-chunk
       IDB; then enable 1ft.
 - [ ] **S5 L5 materials** — QuickJS-wasm sandbox + per-type/time-bucket cache + presets.
-- [ ] **S6 L6 environment** — time static/animated, season, moon, weather, fog+radius (Sky/Stars).
+- [x] **S6 L6 environment** — time static/animated (Sky addon, sun az/elev, day/night lights),
+      season tint, moon (star brightness), weather (rain/snow/storm particles), fog+radius, stars.
+      `map3d/environment.js` (tested) + `EnvPanel.svelte`; env owns all lights. **DONE, verified E2E**
+      (night+stars, storm, noon). Season biome-palette recolour → S5 (deferred). Noon sky a touch pale.
 - [ ] **S7 L7 lighting** — emissive + capped real point lights.
 - [ ] **S8 L8 water** — Water volumes (addons/Water) + flood tool + reactive reflood.
 - [ ] **S9 L9 destruction** — cannon-es debris for props + terrain carve → reflood/remesh.

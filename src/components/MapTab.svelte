@@ -1,10 +1,9 @@
 <script>
-  // Map tab: uploadable background image + freeform polygon regions drawn on an SVG overlay.
-  // Region geometry is stored in normalized 0..1 coords (survives resize). Editing/rolling
-  // lives in RegionEditor.
+  // Map tab: top-down render of the 3D Map (its background, set by the 3D Map tab) + freeform
+  // polygon regions drawn on an SVG overlay. Region geometry is stored in normalized 0..1 coords
+  // (survives resize). Editing/rolling lives in RegionEditor. The background is no longer an
+  // uploaded image — it's the auto-generated topview of the 3D Map (see Map3DTab.renderTopview).
   import { mapData } from '../lib/stores.js';
-  import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
-  import { fileToImageBlob } from '../lib/avatar.js';
   import { viewer } from '../lib/mode.js';
   import { receivedHides } from '../lib/p2p.js';
 
@@ -23,7 +22,6 @@
   let drawing = $state(false);
   let draftPoints = $state([]);
   let cursor = $state(null); // rubber-band endpoint while drawing
-  let bgInput;
 
   // Editor
   let editorOpen = $state(false);
@@ -130,41 +128,12 @@
     x: points.reduce((s, p) => s + p.x, 0) / points.length,
     y: points.reduce((s, p) => s + p.y, 0) / points.length,
   });
-
-  async function onBgSelected(e) {
-    const file = e.target.files?.[0];
-    e.target.value = null;
-    if (!file) return;
-    const blob = await fileToImageBlob(file);
-    if (!blob) return;
-    const oldId = $mapData.backgroundId;
-    const id = newImageId();
-    await putBlob(id, blob);
-    if (oldId) delBlob(oldId);
-    mapData.update((d) => {
-      d.backgroundId = id;
-      return d;
-    });
-  }
-  function clearBg() {
-    const oldId = $mapData.backgroundId;
-    if (oldId) delBlob(oldId);
-    mapData.update((d) => {
-      d.backgroundId = null;
-      return d;
-    });
-  }
 </script>
 
 <div>
   <!-- Toolbar -->
   <div class="flex flex-wrap gap-2 items-center mb-4">
     <h2 class="text-2xl font-bold mr-auto">Map</h2>
-    <button class="btn btn-sm btn-secondary" onclick={() => bgInput.click()}>Upload Map Image</button>
-    <input type="file" accept="image/*" class="hidden" bind:this={bgInput} onchange={onBgSelected} />
-    {#if $mapData.backgroundId}
-      <button class="btn btn-sm btn-ghost" onclick={clearBg}>Clear Background</button>
-    {/if}
     {#if drawing}
       <button class="btn btn-sm btn-success" onclick={finishRegion}>Finish ({draftPoints.length})</button>
       <button class="btn btn-sm btn-ghost" onclick={cancelDraw}>Cancel</button>
@@ -188,6 +157,10 @@
   <div class="relative w-full bg-base-300 rounded overflow-hidden select-none" style="aspect-ratio: 16 / 9;">
     {#if $mapData.backgroundId}
       <BlobImage id={$mapData.backgroundId} alt="map" class="absolute inset-0 w-full h-full object-cover" />
+    {:else if !viewer}
+      <div class="absolute inset-0 flex items-center justify-center text-center text-sm opacity-50 px-6">
+        Build terrain in the <strong class="mx-1">3D Map</strong> tab — its top-down view becomes this map's background.
+      </div>
     {/if}
     <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
     <svg

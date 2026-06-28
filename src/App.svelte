@@ -4,6 +4,7 @@
   import Items from './components/Items.svelte';
   import Crafting from './components/Crafting.svelte';
   import MapTab from './components/MapTab.svelte';
+  import Map3DTab from './components/Map3DTab.svelte';
   import DiceTab from './components/DiceTab.svelte';
   import RelationshipGraph from './components/RelationshipGraph.svelte';
   import Toast from './components/Toast.svelte';
@@ -19,6 +20,7 @@
     { id: 'characters', label: 'Characters' },
     { id: 'items', label: 'Items' },
     { id: 'crafting', label: 'Crafting' },
+    { id: '3dmap', label: '3D Map' },
     { id: 'map', label: 'Map' },
     { id: 'relationships', label: 'Relationships' },
     { id: 'dice', label: 'Dice' },
@@ -108,6 +110,7 @@
     <div class:hidden={tab !== 'characters'}><Characters /></div>
     <div class:hidden={tab !== 'items'}><Items /></div>
     <div class:hidden={tab !== 'crafting'}><Crafting /></div>
+    {#if !viewer}<div class:hidden={tab !== '3dmap'}><Map3DTab /></div>{/if}
     <div class:hidden={tab !== 'map'}><MapTab /></div>
     <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
     <div class:hidden={tab !== 'dice'}><DiceTab /></div>

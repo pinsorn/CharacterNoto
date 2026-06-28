@@ -337,6 +337,7 @@ export function scatterInstances(propId, cx, cz, params, heightAt, seed) {
   const jitter = params && params.jitter != null ? params.jitter : 0.4;
   const scaleVar = params && params.scaleVar != null ? params.scaleVar : 0.3;
   const yawRandom = params ? !!params.yawRandom : true;
+  const size = params && params.size != null ? params.size : 32; // map side length
 
   const rng = mulberry32(seedFor(seed, propId));
   const n = Math.round(density * Math.PI * radius * radius);
@@ -355,7 +356,7 @@ export function scatterInstances(propId, cx, cz, params, heightAt, seed) {
     const jz = (rng() * 2 - 1) * jitter * 0.5;
     const x = gx + 0.5 + jx;
     const z = gz + 0.5 + jz;
-    if (x < 0 || x > 32 || z < 0 || z > 32) continue; // outside the 32×32 world
+    if (x < 0 || x > size || z < 0 || z > size) continue; // outside the map
 
     const y = heightAt(gx, gz);
     const yaw = yawRandom ? rng() * TAU : 0;

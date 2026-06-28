@@ -1,7 +1,6 @@
 // World Painter brush engine (slice S1). Pure terrain-editing stamps over a voxel chunk.
 // No DOM, no three.js. Mutates the chunk in place via the world.js setters (which mark dirty).
 // Imported lazily by Map3DTab; runnable in plain node for the test.
-import { CHUNK } from '../../lib/voxel/types.js';
 import { setColumnHeight, addHeight, paintBiome as setBiome, eraseVoxel, getHeight } from '../../lib/voxel/world.js';
 
 /**
@@ -20,7 +19,7 @@ export const PAINTER_TOOLS = [
   { id: 'paintBiome', label: 'Paint Biome', params: ['radius', 'shape', 'biome'] },
 ];
 
-const inCol = (x, z) => x >= 0 && x < CHUNK && z >= 0 && z < CHUNK;
+const inCol = (size, x, z) => x >= 0 && x < size && z >= 0 && z < size;
 
 /** Per-column scaled effect. Linear falloff (center strongest), rounded to an integer, never negative. */
 function scaled(strength, dist, radius, falloff) {
@@ -58,6 +57,7 @@ export function applyBrush(chunk, cx, cz, opts) {
     seed = 0,
   } = opts;
   const baseline = opts.baseline ?? getHeight(chunk, cx, cz);
+  const N = chunk.size; // per-map side length
 
   // Smooth needs an order-independent read of every source height.
   const snap = tool === 'smooth' ? Int16Array.from(chunk.height) : null;
@@ -71,7 +71,7 @@ export function applyBrush(chunk, cx, cz, opts) {
       }
       const x = cx + dx;
       const z = cz + dz;
-      if (!inCol(x, z)) continue;
+      if (!inCol(N, x, z)) continue;
       const dist = Math.sqrt(dx * dx + dz * dz);
 
       switch (tool) {
@@ -89,13 +89,13 @@ export function applyBrush(chunk, cx, cz, opts) {
           let sum = 0;
           let n = 0;
           for (const [nx, nz] of [[x - 1, z], [x + 1, z], [x, z - 1], [x, z + 1]]) {
-            if (inCol(nx, nz)) {
-              sum += snap[nz * CHUNK + nx];
+            if (inCol(N, nx, nz)) {
+              sum += snap[nz * N + nx];
               n++;
             }
           }
           if (n > 0) {
-            const cur = snap[z * CHUNK + x];
+            const cur = snap[z * N + x];
             const avg = sum / n;
             setColumnHeight(chunk, x, z, cur + (avg - cur) * factor);
           }

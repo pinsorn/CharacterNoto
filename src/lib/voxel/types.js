@@ -1,13 +1,13 @@
 // VoxelDND core constants + material palette + dense-grid key encoding.
 // Adapted from voxeldnd-spec-v1.0.md §3–§4 for the Svelte app. Plain JS + JSDoc (no TS here).
 
-export const CHUNK = 32; // columns per side (spec start)
+export const CHUNK = 32; // DEFAULT columns per side for a fresh map (per-map `size` overrides it)
 export const WORLD_HEIGHT = 64; // max voxel layers (y)
 export const DEFAULT_VOXEL_FT = 5; // build/test at 5 ft coarse first (decision #3)
 
-// The bounded square region (in voxels) a single chunk + the Map-tab topview cover.
-// Fixed so the topview→Map background stays aligned with normalized region polygons every regen.
-export const MAP_EXTENT = CHUNK;
+// Selectable square map sizes (columns/side). The topview always covers the whole map extent
+// (= the current size), so normalized region polygons stay aligned on every regen.
+export const MAP_SIZES = [16, 32, 48, 64, 96, 128];
 
 // Biomes: surface + subsurface colours (decision #2 hybrid heightmap+biome).
 export const BIOMES = [

@@ -4,6 +4,7 @@ import { persisted } from '../stores.js';
 
 export const voxelUI = persisted('voxelUI', {
   mapId: 'default',
+  mapSize: 32, // square map side length (columns); selectable, see MAP_SIZES
   tool: 'raise', // raise|lower|flatten|smooth|roughen|setHeight|carve|paintBiome | place|erase
   brushRadius: 2,
   brushStrength: 1,

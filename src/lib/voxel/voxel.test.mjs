@@ -38,7 +38,7 @@ const WHITE = () => [1, 1, 1];
 {
   const ch = createChunk(0, 0, 6, 0);
   const dense = composeDense(ch);
-  assert.strictEqual(surfaceY(dense, 3, 3), 6, 'surfaceY of flat base 6');
+  assert.strictEqual(surfaceY(dense, 3, 3, CHUNK), 6, 'surfaceY of flat base 6');
   const topIdx = (5 * CHUNK + 3) * CHUNK + 3; // y=5,z=3,x=3
   assert.strictEqual(dense[topIdx], surfaceKey(0), 'top layer is surface biome');
   assert.ok(columnIndex(3, 3) >= 0);

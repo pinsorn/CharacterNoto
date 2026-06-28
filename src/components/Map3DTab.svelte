@@ -10,8 +10,8 @@
   import { mapData, characters } from '../lib/stores.js';
   import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
   import { voxelUI, voxelEnv, voxelObjUI } from '../lib/voxel/store.js';
-  import { CHUNK, WORLD_HEIGHT, MAP_EXTENT, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
-  import { createChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
+  import { CHUNK, WORLD_HEIGHT, MAP_SIZES, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
+  import { createChunk, resizeChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
   import { greedyMesh } from '../lib/voxel/mesher.js';
   import { saveChunk, loadChunk } from '../lib/voxel/chunkStore.js';
   import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
@@ -56,7 +56,7 @@
   const look = { yaw: 0, pitch: 0, dragging: false, px: 0, py: 0 };
 
   // token placement helpers
-  const heightAt = (gx, gz) => (lastDense ? surfaceY(lastDense, gx, gz) : 6);
+  const heightAt = (gx, gz) => (lastDense ? surfaceY(lastDense, gx, gz, chunk.size) : 6);
   const charLookup = (id) => {
     const c = get(characters).find((x) => x.id === id);
     return c ? { name: c.name || '?', color: c.color } : null;
@@ -85,16 +85,16 @@
     const key = `${gx},${gz}`;
     if (!start && key === lastScatterKey) return; // throttle: only when the cell changes
     lastScatterKey = key;
-    appendObjects(scatterInstances(o.propId, gx, gz, { radius: o.radius, density: o.density, jitter: o.jitter, scaleVar: o.scaleVar, yawRandom: o.yawRandom }, heightAt, objSeed++));
+    appendObjects(scatterInstances(o.propId, gx, gz, { radius: o.radius, density: o.density, jitter: o.jitter, scaleVar: o.scaleVar, yawRandom: o.yawRandom, size: chunk.size }, heightAt, objSeed++));
   }
 
-  const clampCell = (v) => Math.min(CHUNK - 1, Math.max(0, v));
-  const colIdx = (x, z) => z * CHUNK + x;
-  const denseGet = (dense) => (x, y, z) => dense[(y * CHUNK + z) * CHUNK + x];
+  const clampCell = (v) => Math.min(chunk.size - 1, Math.max(0, v));
+  const colIdx = (x, z) => z * chunk.size + x;
+  const denseGet = (dense) => (x, y, z) => dense[(y * chunk.size + z) * chunk.size + x];
 
   function rebuild() {
     const dense = composeDense(chunk);
-    const m = greedyMesh([CHUNK, WORLD_HEIGHT, CHUNK], denseGet(dense), colorOf);
+    const m = greedyMesh([chunk.size, WORLD_HEIGHT, chunk.size], denseGet(dense), colorOf);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(m.normals, 3));
@@ -284,7 +284,7 @@
     if (!renderer || !terrainMesh) return;
     const W = 1024, H = 576;
     if (!topTarget) topTarget = new THREE.WebGLRenderTarget(W, H);
-    const ext = MAP_EXTENT;
+    const ext = chunk.size;
     const halfH = ext / 2, halfW = halfH * (W / H);
     const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 1000);
     cam.position.set(ext / 2, WORLD_HEIGHT + 20, ext / 2);
@@ -322,16 +322,41 @@
   function setPreset(preset) {
     voxelUI.update((u) => ({ ...u, cameraPreset: preset }));
     if (!camera) return;
-    const c = CHUNK;
+    const c = chunk.size;
     if (preset === 'top') camera.position.set(c / 2, c * 1.7, c / 2 + 0.001);
     else camera.position.set(c * 1.15, c * 1.0, c * 1.15);
     controls.target.set(c / 2, 0, c / 2);
     controls.update();
   }
 
+  // (Re)build the ground grid + invisible pick plane sized to the current map.
+  function buildGrid() {
+    const n = chunk.size;
+    if (gridHelper) { scene.remove(gridHelper); gridHelper.geometry?.dispose(); gridHelper.material?.dispose?.(); }
+    gridHelper = new THREE.GridHelper(n, n, 0x335577, 0x223344);
+    gridHelper.position.set(n / 2, 0.02, n / 2);
+    scene.add(gridHelper);
+    if (pickPlane) { scene.remove(pickPlane); pickPlane.geometry.dispose(); pickPlane.material.dispose(); }
+    pickPlane = new THREE.Mesh(new THREE.PlaneGeometry(n, n), new THREE.MeshBasicMaterial({ visible: false }));
+    pickPlane.rotation.x = -Math.PI / 2;
+    pickPlane.position.set(n / 2, 0, n / 2);
+    scene.add(pickPlane);
+  }
+
+  function resizeMap(n) {
+    if (n === chunk.size) return;
+    chunk = resizeChunk(chunk, n); // preserves the overlapping region
+    voxelUI.update((u) => ({ ...u, mapSize: n }));
+    buildGrid();
+    rebuild();
+    setPreset(get(voxelUI).cameraPreset);
+    scheduleSave();
+    scheduleTopview();
+  }
+
   function resetMap() {
     if (!confirm('Reset the 3D map to flat ground? This clears terrain edits.')) return;
-    chunk = createChunk();
+    chunk = createChunk(0, 0, 6, 0, chunk.size);
     rebuild();
     scheduleSave();
     scheduleTopview();
@@ -359,17 +384,7 @@
 
     terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
 
-    gridHelper = new THREE.GridHelper(CHUNK, CHUNK, 0x335577, 0x223344);
-    gridHelper.position.set(CHUNK / 2, 0.02, CHUNK / 2);
-    scene.add(gridHelper);
-
-    pickPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(CHUNK, CHUNK),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    pickPlane.rotation.x = -Math.PI / 2;
-    pickPlane.position.set(CHUNK / 2, 0, CHUNK / 2);
-    scene.add(pickPlane);
+    buildGrid();
 
     tokenGroup = createTokenGroup(THREE);
     scene.add(tokenGroup);
@@ -387,7 +402,8 @@
 
     // Load persisted chunk (or start flat), then build + initial topview.
     loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
-      if (loaded) chunk = loaded;
+      chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
+      buildGrid(); // size may differ from the initial default
       rebuild();
       setPreset(get(voxelUI).cameraPreset);
       renderer.render(scene, camera);
@@ -460,6 +476,11 @@
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'top' ? 'btn-active' : ''}" onclick={() => setPreset('top')}>Top</button>
     </div>
+    <label class="flex items-center gap-1 text-xs">Size
+      <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
+        {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
+      </select>
+    </label>
     <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
     <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
   </div>

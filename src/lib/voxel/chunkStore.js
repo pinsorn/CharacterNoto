@@ -22,15 +22,17 @@ const chunkKey = (mapId, cx, cz) => `${mapId}/${cx},${cz}`;
 
 export async function saveChunk(mapId, ch) {
   const s = await tx('readwrite');
-  await wrap(s.put({ cx: ch.cx, cz: ch.cz, height: ch.height, biome: ch.biome, overrides: ch.overrides, carves: ch.carves }, chunkKey(mapId, ch.cx, ch.cz)));
+  await wrap(s.put({ cx: ch.cx, cz: ch.cz, size: ch.size, height: ch.height, biome: ch.biome, overrides: ch.overrides, carves: ch.carves }, chunkKey(mapId, ch.cx, ch.cz)));
 }
 
 export async function loadChunk(mapId, cx, cz) {
   const s = await tx('readonly');
   const raw = await wrap(s.get(chunkKey(mapId, cx, cz)));
   if (!raw) return null;
+  // legacy chunks (pre-resizable) have no `size`; infer from the square height array.
+  const size = raw.size || Math.round(Math.sqrt(raw.height.length));
   return {
-    cx, cz,
+    cx, cz, size,
     height: raw.height,
     biome: raw.biome,
     overrides: raw.overrides instanceof Map ? raw.overrides : new Map(raw.overrides || []),

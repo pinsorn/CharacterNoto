@@ -35,6 +35,36 @@ export const BLOCKS = [
   { id: 6, name: 'Dark', color: '#3a3a44' },
 ];
 
+// Object-layer colour legend: a pixel's colour in the OBJECT image picks WHICH prop to scatter
+// (so one image can place many prop types). Paint these exact colours where you want each prop;
+// anything nearest to white places nothing. Colours are mutually distinct in RGB → unambiguous
+// nearest-match. propId matches the built-in PROPS in components/map3d/objects.js.
+export const OBJECT_KEYS = [
+  { color: [0x2e, 0xcc, 0x40], propId: 'tree', name: 'Tree' },     // bright green
+  { color: [0x0a, 0x6b, 0x4a], propId: 'pine', name: 'Pine' },     // dark teal-green
+  { color: [0xbf, 0xe0, 0x4a], propId: 'bush', name: 'Bush' },     // yellow-green
+  { color: [0x9b, 0x9b, 0x9b], propId: 'rock', name: 'Rock' },     // mid grey
+  { color: [0x55, 0x55, 0x55], propId: 'boulder', name: 'Boulder' }, // dark grey
+  { color: [0x8b, 0x5a, 0x2b], propId: 'stump', name: 'Stump' },   // brown
+  { color: [0xcc, 0x33, 0xff], propId: 'crystal', name: 'Crystal' }, // magenta
+  { color: [0xff, 0xff, 0xff], propId: null, name: '(none)' },     // background → no object
+];
+
+/**
+ * Nearest OBJECT_KEYS propId for an (r,g,b) colour (0..255), or null when the closest key is
+ * the "(none)" background. Pure Euclidean RGB nearest-match.
+ * @returns {string|null}
+ */
+export function objectPropForColor(r, g, b) {
+  let best = OBJECT_KEYS[0], bestD = Infinity;
+  for (const k of OBJECT_KEYS) {
+    const dr = r - k.color[0], dg = g - k.color[1], db = b - k.color[2];
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  return best.propId;
+}
+
 // --- dense-grid colour-key encoding (0 = empty) ---------------------------
 // surface biome b  → 1 + b
 // subsurface biome → 1 + MAXBIOME + b

@@ -10,7 +10,7 @@
 // Resolution R = image px per voxel, so global cell (gx,gz) samples the image pixel block
 //   [gx*R, gx*R+R) × [gz*R, gz*R+R)  (clamped to image bounds).
 // Cells whose block starts past the image edge → lowest/empty: height=base, biome 0, no object.
-import { BIOMES, WORLD_HEIGHT, hex } from './types.js';
+import { BIOMES, WORLD_HEIGHT, hex, objectPropForColor } from './types.js';
 
 /** Rec.601 luminance (0..255) of an RGB triple — identical to imageTerrain. */
 const lum601 = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
@@ -65,7 +65,7 @@ export function avgBlockRGB(img, gx, gz, R) {
  * @typedef {Object} ChunkLayers
  * @property {{on:boolean,maxHeight?:number,invert?:boolean,base?:number}} [height]
  * @property {{on:boolean}} [biome]
- * @property {{on:boolean,propId?:string,threshold?:number,density?:number}} [object]
+ * @property {{on:boolean,density?:number}} [object] colour-keyed (OBJECT_KEYS) → prop; density gates count
  */
 
 /**
@@ -78,8 +78,8 @@ export function avgBlockRGB(img, gx, gz, R) {
  * Per-cell math matches imageTerrain:
  *   height = base + round((lum/255)*(maxHeight-base))  (invert → t=1-t), clamped 0..WORLD_HEIGHT-1.
  *   biome  = nearest BIOMES.surface (×255) by Euclidean RGB.
- *   object = cells with lum/255 < threshold emit with prob `density` via a DETERMINISTIC
- *            hash of the GLOBAL (gx,gz); yaw/scale/seed are bit-sliced from that hash.
+ *   object = nearest OBJECT_KEYS colour → that prop (null = background, skipped), emitted with prob
+ *            `density` via a DETERMINISTIC hash of the GLOBAL (gx,gz); yaw/scale/seed bit-sliced from it.
  * Cells whose block starts past the image edge → height=base, biome 0, no object.
  *
  * @param {{width:number,height:number,data:Uint8ClampedArray}} img Canvas ImageData (RGBA).
@@ -102,8 +102,6 @@ export function chunkFromImage(img, cx, cz, dim, R, layers = {}) {
   const maxHeight = hL.maxHeight ?? 24;
   const invert = hL.invert === true;
   const base = hL.base ?? 1;
-  const propId = oL.propId ?? 'tree';
-  const threshold = oL.threshold ?? 0.5;
   const density = oL.density ?? 0.4;
 
   const { width, height: imgH } = img;
@@ -156,15 +154,15 @@ export function chunkFromImage(img, cx, cz, dim, R, layers = {}) {
       }
 
       if (objectOn) {
-        const lum = lum601(r, g, b) / 255;
-        if (lum >= threshold) continue; // only dark = vegetation
+        const pid = objectPropForColor(r, g, b); // pixel colour → which prop (null = background)
+        if (!pid) continue;
         const hsh = hash2(gx, gz); // GLOBAL coords → deterministic across chunks
         const gate = (hsh & 0xffff) / 0x10000;
         if (gate >= density) continue;
         const yaw = (((hsh >>> 16) & 0xff) / 0x100) * TAU;
         const scale = 0.8 + (((hsh >>> 24) & 0xff) / 0x100) * 0.4; // 0.8..1.2
         const y = heightOn ? heightOut[local] : 1; // spec: 1 when height layer off
-        objects.push({ propId, pos: { x: gx + 0.5, y, z: gz + 0.5 }, yaw, scale, seed: hsh });
+        objects.push({ propId: pid, pos: { x: gx + 0.5, y, z: gz + 0.5 }, yaw, scale, seed: hsh });
       }
     }
   }

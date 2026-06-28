@@ -12,8 +12,7 @@
   //     layers only. Disabled: height → flat base (all 1), biome → all 0, objects → [].
   //   fullscreen (bindable) — toolbar button toggles it; we just style for both.
   import { imageToHeights, imageToBiomes, imageToObjects } from '../lib/voxel/imageTerrain.js';
-  import { BIOMES, MAX_MAP_SIZE, hex } from '../lib/voxel/types.js';
-  import { PROPS } from './map3d/objects.js';
+  import { BIOMES, MAX_MAP_SIZE, hex, OBJECT_KEYS } from '../lib/voxel/types.js';
 
   let { onApply, fullscreen = $bindable(false) } = $props();
 
@@ -45,9 +44,10 @@
   let R = $state(4); // pixels-per-voxel resolution
   let maxHeight = $state(24);
   let invert = $state(false);
-  let propId = $state('tree');
-  let threshold = $state(0.5);
-  let density = $state(0.4);
+  let density = $state(0.4); // global scatter probability; the OBJECT image's colour picks the prop
+
+  // propId → its OBJECT_KEYS swatch colour (for the preview dots + legend), built once.
+  const PROP_KEY_RGB = new Map(OBJECT_KEYS.filter((k) => k.propId).map((k) => [k.propId, k.color]));
 
   let applied = $state(false);
 
@@ -121,7 +121,7 @@
     if (!objectEnabled || !objectSrc || !previewN) return [];
     // heightAt: use the live heights array when the Height layer is on, else flat 1 (spec).
     const heightAt = (gx, gz) => (heights ? heights[gz * previewN + gx] : 1);
-    return imageToObjects(objectSrc, previewN, { propId, threshold, density, heightAt });
+    return imageToObjects(objectSrc, previewN, { density, heightAt });
   });
 
   // --- preview canvases -------------------------------------------------------
@@ -149,8 +149,8 @@
     const n = previewN;
     if (!baseImg || !n) return;
     const hArr = heights, bArr = biomes, objs = objects, mh = maxHeight;
-    // object cells (gx,gz from pos.x-0.5 / pos.z-0.5 → floor of pos)
-    const objCells = new Set(objs.map((o) => Math.floor(o.pos.z) * n + Math.floor(o.pos.x)));
+    // object cells → the placed prop's swatch colour (multi-prop: colour identifies the type)
+    const objCells = new Map(objs.map((o) => [Math.floor(o.pos.z) * n + Math.floor(o.pos.x), PROP_KEY_RGB.get(o.propId) || OBJ_RGB]));
 
     // Height: grayscale normalised to maxHeight (flat mid-grey if disabled).
     paint(heightCanvas, n, (x, z) => {
@@ -163,10 +163,11 @@
     // Biome: each cell painted its biome surface colour (all biome 0 if disabled).
     paint(biomeCanvas, n, (x, z) => BIOME_RGB[bArr ? bArr[z * n + x] : 0] || BIOME_RGB[0]);
 
-    // Object: faint biome/base background + bright dots where objects land.
+    // Object: faint biome/base background + a coloured dot (per prop) where objects land.
     paint(objectCanvas, n, (x, z) => {
       const i = z * n + x;
-      if (objCells.has(i)) return OBJ_RGB;
+      const dot = objCells.get(i);
+      if (dot) return dot;
       const base = bArr ? (BIOME_RGB[bArr[i]] || BIOME_RGB[0]) : [70, 70, 70];
       return [Math.round(base[0] * 0.45), Math.round(base[1] * 0.45), Math.round(base[2] * 0.45)];
     });
@@ -174,7 +175,8 @@
     // Composite: biome colour shaded by height (lighter = higher) + object dots on top.
     paint(compositeCanvas, n, (x, z) => {
       const i = z * n + x;
-      if (objCells.has(i)) return OBJ_RGB;
+      const dot = objCells.get(i);
+      if (dot) return dot;
       const base = bArr ? (BIOME_RGB[bArr[i]] || BIOME_RGB[0]) : BIOME_RGB[0];
       const t = hArr ? Math.max(0, Math.min(1, hArr[i] / Math.max(1, mh))) : 0.6;
       const shade = 0.45 + 0.55 * t;
@@ -195,7 +197,7 @@
           layers: {
             height: { on: heightEnabled, maxHeight, invert, base: BASE_HEIGHT },
             biome: { on: biomeEnabled },
-            object: { on: objectEnabled, propId, threshold, density },
+            object: { on: objectEnabled, density },
           },
           imgs: { height: heightSrc, biome: biomeSrc, object: objectSrc },
         });
@@ -326,16 +328,14 @@
         <span class="opacity-70">Override image (optional)</span>
         <input type="file" accept="image/*" class="file-input file-input-bordered file-input-xs w-full" onchange={onObjectFile} />
       </label>
-      <label class="block text-xs">
-        <span class="opacity-70">Prop</span>
-        <select class="select select-bordered select-xs w-full" bind:value={propId} disabled={!objectEnabled}>
-          {#each PROPS as p}<option value={p.id}>{p.name}</option>{/each}
-        </select>
-      </label>
-      <label class="block text-xs">
-        <span class="flex justify-between"><span>Threshold</span><span class="opacity-60">{threshold}</span></span>
-        <input type="range" class="range range-xs w-full" min="0" max="1" step="0.05" bind:value={threshold} disabled={!objectEnabled} />
-      </label>
+      <div class="text-xs opacity-70">Pixel <strong>colour</strong> → which prop. Paint the object image with these:</div>
+      <div class="flex flex-wrap gap-1">
+        {#each OBJECT_KEYS.filter((k) => k.propId) as k}
+          <span class="inline-flex items-center gap-1 text-[10px] badge badge-sm badge-ghost" title="rgb({k.color[0]},{k.color[1]},{k.color[2]})">
+            <span class="w-3 h-3 rounded-sm border border-base-300" style="background: rgb({k.color[0]},{k.color[1]},{k.color[2]})"></span>{k.name}
+          </span>
+        {/each}
+      </div>
       <label class="block text-xs">
         <span class="flex justify-between"><span>Density</span><span class="opacity-60">{density}</span></span>
         <input type="range" class="range range-xs w-full" min="0" max="1" step="0.05" bind:value={density} disabled={!objectEnabled} />

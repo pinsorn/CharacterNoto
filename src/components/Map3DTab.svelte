@@ -63,6 +63,7 @@
   const raycaster = new THREE.Raycaster();
 
   let mode = $state('terrain'); // 'terrain' | 'tokens'
+  let fs = $state(false); // full-screen the whole 3D Map tab
   let selectedTokenId = $state(null);
   let possessing = $state(false);
   const look = { yaw: 0, pitch: 0, dragging: false, px: 0, py: 0 };
@@ -454,7 +455,7 @@
   }
 
   onMount(() => {
-    const w = container.clientWidth || 800, h = 460;
+    const w = container.clientWidth || 800, h = container.clientHeight || 460;
     scene = new THREE.Scene();
     scene.background = new THREE.Color('#9ec7e8');
 
@@ -523,11 +524,11 @@
     raf = requestAnimationFrame(tick);
 
     const ro = new ResizeObserver(() => {
-      const ww = container.clientWidth;
-      if (!ww) return;
-      camera.aspect = ww / h;
+      const ww = container.clientWidth, hh = container.clientHeight;
+      if (!ww || !hh) return;
+      camera.aspect = ww / hh;
       camera.updateProjectionMatrix();
-      renderer.setSize(ww, h);
+      renderer.setSize(ww, hh);
     });
     ro.observe(container);
     container._cleanup = () => ro.disconnect();
@@ -594,7 +595,7 @@
   });
 </script>
 
-<div>
+<div class={fs ? 'fixed inset-0 z-50 bg-base-100 overflow-auto p-3' : ''}>
   <div class="flex flex-wrap gap-2 items-center mb-3">
     <h2 class="text-2xl font-bold mr-auto">3D Map</h2>
     <div class="join">
@@ -606,6 +607,7 @@
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'top' ? 'btn-active' : ''}" onclick={() => setPreset('top')}>Top</button>
     </div>
+    <button class="btn btn-xs btn-ghost" onclick={() => (fs = !fs)}>{fs ? '⤡ Exit full screen' : '⤢ Full screen'}</button>
     {#if !bigMap}
       <label class="flex items-center gap-1 text-xs">Size
         <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
@@ -679,7 +681,7 @@
   </div>
 
   <div class="relative">
-    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style="height: 460px;"></div>
+    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style={fs ? 'height: calc(100vh - 200px);' : 'height: 460px;'}></div>
     {#if possessing}
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
     {/if}

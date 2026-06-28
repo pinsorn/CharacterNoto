@@ -8,7 +8,7 @@
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { mapData, characters } from '../lib/stores.js';
-  import { putBlob, delBlob, newImageId } from '../lib/blobstore.js';
+  import { putBlob, getBlob, delBlob, newImageId } from '../lib/blobstore.js';
   import { voxelUI, voxelEnv, voxelObjUI } from '../lib/voxel/store.js';
   import { CHUNK, WORLD_HEIGHT, MAP_SIZES, BIOMES, BLOCKS, colorOf } from '../lib/voxel/types.js';
   import { createChunk, resizeChunk, composeDense, placeBlock, eraseVoxel, surfaceY } from '../lib/voxel/world.js';
@@ -17,10 +17,16 @@
   import { PAINTER_TOOLS, applyBrush as paintBrush } from './map3d/brushes.js';
   import TokenPanel from './map3d/TokenPanel.svelte';
   import { createTokenGroup, syncTokenGroup, SIZES } from './map3d/tokens.js';
+  import { loadTokenModel } from './map3d/tokenModels.js';
   import EnvPanel from './map3d/EnvPanel.svelte';
   import { createEnvironment } from './map3d/environment.js';
   import ObjectPanel from './map3d/ObjectPanel.svelte';
-  import { createObjectLayer, syncObjectLayer, scatterInstances } from './map3d/objects.js';
+  import { createObjectLayer, syncObjectLayer, scatterInstances, PROPS } from './map3d/objects.js';
+  import ObjectEditor from './map3d/ObjectEditor.svelte';
+  import { customProps } from '../lib/voxel/customProps.js';
+  import { buildPropGeometry } from '../lib/voxel/voxelProp.js';
+  import ImageTerrainPanel from './map3d/ImageTerrainPanel.svelte';
+  import { imageToHeights, imageToBiomes, imageToObjects } from '../lib/voxel/imageTerrain.js';
 
   const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
@@ -61,11 +67,32 @@
     const c = get(characters).find((x) => x.id === id);
     return c ? { name: c.name || '?', color: c.color } : null;
   };
+  // Imported token models: blob (IndexedDB) → object URL (cached per modelId) → loaded clone.
+  const modelUrlCache = new Map();
+  async function modelUrlFor(id) {
+    if (modelUrlCache.has(id)) return modelUrlCache.get(id);
+    const b = await getBlob(id);
+    if (!b) return null;
+    const u = URL.createObjectURL(b);
+    modelUrlCache.set(id, u);
+    return u;
+  }
+  const modelProvider = (token) =>
+    token.modelId ? modelUrlFor(token.modelId).then((u) => (u ? loadTokenModel(u, token.modelFormat || 'glb') : null)) : null;
+
   function syncTokens() {
-    if (tokenGroup) syncTokenGroup(tokenGroup, get(mapData).tokens || [], charLookup, heightAt, THREE);
+    if (tokenGroup) syncTokenGroup(tokenGroup, get(mapData).tokens || [], charLookup, heightAt, THREE, modelProvider);
+  }
+  const PROP_BUILTIN = new Map(PROPS.map((p) => [p.id, p]));
+  // Resolve geometry for a propId: built-in library first, else a user voxel prop.
+  function geometryFor(pid, T) {
+    const b = PROP_BUILTIN.get(pid);
+    if (b) return b.build(T);
+    const custom = get(customProps).find((p) => p.id === pid);
+    return custom ? buildPropGeometry(custom, T) : null;
   }
   function syncObjects() {
-    if (objectLayer) syncObjectLayer(objectLayer, get(mapData).objects || [], THREE);
+    if (objectLayer) syncObjectLayer(objectLayer, get(mapData).objects || [], THREE, geometryFor);
   }
   function appendObjects(arr) {
     if (!arr?.length) return;
@@ -362,6 +389,23 @@
     scheduleTopview();
   }
 
+  // Apply an uploaded image to the terrain: height (brightness), biome (colour), or scatter objects.
+  function applyImage(imageData, mode, opts) {
+    const n = chunk.size;
+    if (mode === 'height') {
+      chunk.height = imageToHeights(imageData, n, opts);
+      chunk.dirty = true;
+    } else if (mode === 'biome') {
+      chunk.biome = imageToBiomes(imageData, n);
+      chunk.dirty = true;
+    } else if (mode === 'object') {
+      appendObjects(imageToObjects(imageData, n, { ...opts, heightAt }));
+    }
+    rebuild();
+    scheduleSave();
+    scheduleTopview();
+  }
+
   onMount(() => {
     const w = container.clientWidth || 800, h = 460;
     scene = new THREE.Scene();
@@ -462,6 +506,17 @@
     const _ = $mapData.objects;
     if (objectLayer) syncObjects();
   });
+
+  // Custom voxel props changed (created/edited in the Object Editor) → drop cached geometry so
+  // edits re-render, then resync.
+  $effect(() => {
+    const _ = $customProps;
+    if (objectLayer) {
+      objectLayer.userData.geoCache.forEach((g) => g.dispose?.());
+      objectLayer.userData.geoCache.clear();
+      syncObjects();
+    }
+  });
 </script>
 
 <div>
@@ -558,10 +613,20 @@
     <div class="collapse-content"><EnvPanel minuteLabel={envMinute} /></div>
   </details>
 
+  {#if mode === 'terrain'}
+    <details class="collapse collapse-arrow bg-base-200 rounded mt-3">
+      <summary class="collapse-title text-sm font-semibold py-2 min-h-0">Import image → terrain (height · biome · objects)</summary>
+      <div class="collapse-content"><ImageTerrainPanel onApply={applyImage} /></div>
+    </details>
+  {/if}
   {#if mode === 'tokens'}
     <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} /></div>
   {/if}
   {#if mode === 'objects'}
     <div class="mt-3"><ObjectPanel /></div>
+    <details class="collapse collapse-arrow bg-base-200 rounded mt-3">
+      <summary class="collapse-title text-sm font-semibold py-2 min-h-0">Voxel Object Editor (build custom props)</summary>
+      <div class="collapse-content"><ObjectEditor /></div>
+    </details>
   {/if}
 </div>

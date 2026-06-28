@@ -214,7 +214,7 @@ export function createObjectLayer(scene, THREE) {
  * @param {Array<{propId:string,pos:{x:number,y:number,z:number},yaw:number,scale:number,seed:number}>} objects
  * @param {object} THREE
  */
-export function syncObjectLayer(layer, objects, THREE) {
+export function syncObjectLayer(layer, objects, THREE, geometryFor) {
   const geoCache = layer.userData.geoCache;
   const meshes = layer.userData.meshes;
   const mat = layer.userData.material;
@@ -240,12 +240,14 @@ export function syncObjectLayer(layer, objects, THREE) {
   const dummy = new THREE.Object3D();
 
   for (const [pid, list] of byProp) {
-    const prop = PROP_BY_ID.get(pid);
-    if (!prop) continue; // unknown propId — skip silently
-
-    // build geometry once, cache per propId
+    // build geometry once, cache per propId. geometryFor (overseer) resolves custom props;
+    // fall back to the built-in library.
     let geo = geoCache.get(pid);
-    if (!geo) { geo = prop.build(THREE); geoCache.set(pid, geo); }
+    if (!geo) {
+      geo = geometryFor ? geometryFor(pid, THREE) : PROP_BY_ID.get(pid)?.build(THREE);
+      if (!geo) continue; // unknown propId — skip silently
+      geoCache.set(pid, geo);
+    }
 
     const count = list.length;
     let mesh = meshes.get(pid);

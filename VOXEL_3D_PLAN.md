@@ -91,6 +91,16 @@ exporting a small init/update/dispose; the OVERSEER wires the few lines into Map
 - Viewer/player path: tokens+objects added to publicview (unit-tested, additive); players see them
   baked into the topview PNG. Not re-E2E'd live this milestone.
 
+## Review-fix batch (post-v3.8.0, from VOXEL_3D_CHECKLIST.md comments)
+- [x] L3 possession "can't rotate" → POV accepts left OR right drag + pointer-capture; fixed
+      exit-POV invisible-pawn bug. (committed)
+- [x] L3 token rotation X/Y/Z in panel (pitch/facing/roll, degrees). (committed)
+- [x] L1 **map size customization** — per-map square `size` (16..128), `resizeChunk`. (committed)
+- [ ] L1 **image → terrain** (height/biome/object) — `imageTerrain.js` + panel (subagent B → integrating)
+- [ ] L3 **GLB/OBJ/STL token models** — `tokenModels.js` loader (subagent C → integrating)
+- [ ] L4 **voxel object editor** — `voxelProp.js` + `ObjectEditor.svelte` + `customProps` (subagent D → integrating)
+- Release the batch as v3.9.0 when all green + E2E.
+
 ## File map (new)
 - `src/lib/voxel/types.js` — constants, factories, JSDoc schemas, MAP_EXTENT.
 - `src/lib/voxel/chunkStore.js` — IDB `voxelworld` per-chunk persistence.

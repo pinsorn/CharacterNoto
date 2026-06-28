@@ -6,9 +6,12 @@
   import { voxelObjUI } from '../../lib/voxel/store.js';
   import { mapData } from '../../lib/stores.js';
   import { PROPS } from './objects.js';
+  import { customProps } from '../../lib/voxel/customProps.js';
 
   const ui = $derived($voxelObjUI);
   const count = $derived($mapData.objects?.length ?? 0);
+  // Built-in props + user-authored voxel props (from the Object Editor).
+  const allProps = $derived([...PROPS, ...$customProps]);
 
   // Single immutable writer for every voxelObjUI field.
   const set = (field, val) => voxelObjUI.update((u) => ({ ...u, [field]: val }));
@@ -19,7 +22,7 @@
 <div class="space-y-2 text-sm">
   <!-- Prop picker -->
   <div class="flex flex-wrap gap-1">
-    {#each PROPS as p}
+    {#each allProps as p}
       <button
         type="button"
         class="btn btn-xs {ui.propId === p.id ? 'btn-primary' : 'btn-ghost btn-outline'}"

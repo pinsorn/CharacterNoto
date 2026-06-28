@@ -117,7 +117,7 @@ function buildToken(THREE, token) {
 
 // Update an existing token group's transform / colour / label to match the token (cheap; called
 // on every sync). Size changes are pure .scale tweaks — no geometry rebuild.
-function updateToken(THREE, grp, token, charLookup, heightAt) {
+function updateToken(THREE, grp, token, charLookup, heightAt, modelProvider) {
   const { foot, scale: s } = sizeOf(token);
   const colorHex = resolveColor(token, charLookup);
   const { base, body, notch, label } = grp.userData.parts;
@@ -154,6 +154,30 @@ function updateToken(THREE, grp, token, charLookup, heightAt) {
       label.userData.key = key;
     }
   }
+
+  // Imported model: when token.modelId is set, hide the pawn body/notch and show a loaded mesh
+  // (async via modelProvider so this module stays DOM/blob-free). Keeps the base disc + label.
+  if (token.modelId && modelProvider) {
+    body.visible = false;
+    notch.visible = false;
+    if (grp.userData.modelKey !== token.modelId) {
+      grp.userData.modelKey = token.modelId;
+      if (grp.userData.model) { grp.remove(grp.userData.model); grp.userData.model = null; }
+      const reqKey = token.modelId;
+      Promise.resolve(modelProvider(token)).then((m) => {
+        if (!m || grp.userData.modelKey !== reqKey) return;
+        m.scale.setScalar(s);
+        grp.userData.model = m;
+        grp.add(m);
+      }).catch(() => { body.visible = true; notch.visible = true; });
+    } else if (grp.userData.model) {
+      grp.userData.model.scale.setScalar(s);
+    }
+  } else {
+    body.visible = true;
+    notch.visible = true;
+    if (grp.userData.model) { grp.remove(grp.userData.model); grp.userData.model = null; grp.userData.modelKey = null; }
+  }
 }
 
 /**
@@ -165,7 +189,7 @@ function updateToken(THREE, grp, token, charLookup, heightAt) {
  * @param {(gx:number,gz:number)=>number} heightAt surface top y for placement
  * @param {*} THREE
  */
-export function syncTokenGroup(group, tokens, charLookup, heightAt, THREE) {
+export function syncTokenGroup(group, tokens, charLookup, heightAt, THREE, modelProvider) {
   const want = new Map(tokens.map((t) => [t.id, t]));
   // remove + dispose tokens that no longer exist
   for (const child of [...group.children]) {
@@ -182,7 +206,7 @@ export function syncTokenGroup(group, tokens, charLookup, heightAt, THREE) {
       grp = buildToken(THREE, token);
       group.add(grp);
     }
-    updateToken(THREE, grp, token, charLookup, heightAt);
+    updateToken(THREE, grp, token, charLookup, heightAt, modelProvider);
   }
 }
 

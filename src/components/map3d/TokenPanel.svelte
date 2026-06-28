@@ -4,6 +4,8 @@
   // with an immutable spread so Svelte, the localStorage persistence, and the P2P rebroadcast all
   // fire — and regions/backgroundId are preserved on every write.
   import { mapData, characters } from '../../lib/stores.js';
+  import { putBlob, delBlob, newImageId } from '../../lib/blobstore.js';
+  import { formatFromName, SUPPORTED_MODEL_FORMATS } from './tokenModels.js';
 
   let { selectedId = $bindable(null), onPossess } = $props();
 
@@ -60,8 +62,29 @@
   }
 
   function del(id) {
+    const t = tokens.find((x) => x.id === id);
+    if (t?.modelId) delBlob(t.modelId);
     setTokens(tokens.filter((t) => t.id !== id));
     if (selectedId === id) selectedId = null; // collapse the edit area
+  }
+
+  // Import a 3D model (GLB/GLTF/OBJ/STL) for the selected token → store bytes in IndexedDB.
+  async function uploadModel(e) {
+    const file = e.target.files?.[0];
+    e.target.value = null;
+    if (!file || !selected) return;
+    const fmt = formatFromName(file.name);
+    if (!fmt) { alert('Unsupported model. Use ' + SUPPORTED_MODEL_FORMATS.join(', ')); return; }
+    const oldId = selected.modelId;
+    const id = newImageId();
+    await putBlob(id, file);
+    if (oldId) delBlob(oldId);
+    patch(selected.id, { modelId: id, modelFormat: fmt, modelName: file.name });
+  }
+  function clearModel() {
+    if (!selected) return;
+    if (selected.modelId) delBlob(selected.modelId);
+    patch(selected.id, { modelId: undefined, modelFormat: undefined, modelName: undefined });
   }
 </script>
 
@@ -154,6 +177,17 @@
           <input type="number" step="15" class="input input-xs input-bordered w-16" value={deg(selected.roll)}
             oninput={(e) => patch(selected.id, { roll: rad(e.target.value) })} />
         </label>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap text-xs">
+        <span class="opacity-60">Model</span>
+        <label class="btn btn-xs">{selected.modelId ? 'Replace' : 'Import GLB/OBJ/STL'}
+          <input type="file" accept=".glb,.gltf,.obj,.stl" class="hidden" onchange={uploadModel} />
+        </label>
+        {#if selected.modelId}
+          <span class="truncate max-w-[10rem]" title={selected.modelName}>{selected.modelName || selected.modelFormat}</span>
+          <button class="btn btn-xs btn-ghost" onclick={clearModel}>Clear</button>
+        {/if}
       </div>
 
       <label class="flex items-center gap-1 text-xs">Height

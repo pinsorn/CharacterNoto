@@ -7,7 +7,11 @@ export const DEFAULT_VOXEL_FT = 5; // build/test at 5 ft coarse first (decision 
 
 // Selectable square map sizes (columns/side). The topview always covers the whole map extent
 // (= the current size), so normalized region polygons stay aligned on every regen.
-export const MAP_SIZES = [16, 32, 48, 64, 96, 128];
+// MAX_MAP_SIZE is the current single-chunk ceiling (one greedy-meshed chunk). Larger maps
+// (→1024 via multi-chunk meshing, →thousands via streaming+LOD) are a future engine phase —
+// see VOXEL_3D_PLAN.md. The Image Editor clamps imported sizes to this.
+export const MAX_MAP_SIZE = 256;
+export const MAP_SIZES = [16, 32, 48, 64, 96, 128, 192, 256];
 
 // Biomes: surface + subsurface colours (decision #2 hybrid heightmap+biome).
 export const BIOMES = [

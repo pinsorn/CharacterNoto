@@ -5,6 +5,8 @@
   import Crafting from './components/Crafting.svelte';
   import MapTab from './components/MapTab.svelte';
   import Map3DTab from './components/Map3DTab.svelte';
+  import ImageEditor from './components/ImageEditor.svelte';
+  import { applyImageMap } from './lib/voxel/applyImageMap.js';
   import DiceTab from './components/DiceTab.svelte';
   import RelationshipGraph from './components/RelationshipGraph.svelte';
   import Toast from './components/Toast.svelte';
@@ -21,6 +23,7 @@
     { id: 'items', label: 'Items' },
     { id: 'crafting', label: 'Crafting' },
     { id: '3dmap', label: '3D Map' },
+    { id: 'imageeditor', label: 'Image Editor' },
     { id: 'map', label: 'Map' },
     { id: 'relationships', label: 'Relationships' },
     { id: 'dice', label: 'Dice' },
@@ -29,6 +32,7 @@
   const tabs = $derived(viewer ? allTabs.filter((t) => $receivedShare?.[t.id]) : allTabs);
 
   let tab = $state('characters');
+  let imgFull = $state(false); // Image Editor full-screen
   $effect(() => {
     if (tabs.length && !tabs.some((t) => t.id === tab)) tab = tabs[0].id;
   });
@@ -111,6 +115,11 @@
     <div class:hidden={tab !== 'items'}><Items /></div>
     <div class:hidden={tab !== 'crafting'}><Crafting /></div>
     {#if !viewer}<div class:hidden={tab !== '3dmap'}><Map3DTab /></div>{/if}
+    {#if !viewer}
+      <div class:hidden={tab !== 'imageeditor'} class:fixed={imgFull} class:inset-0={imgFull} class:z-50={imgFull} class:bg-base-100={imgFull} class:overflow-auto={imgFull} class:p-4={imgFull}>
+        <ImageEditor onApply={applyImageMap} bind:fullscreen={imgFull} />
+      </div>
+    {/if}
     <div class:hidden={tab !== 'map'}><MapTab /></div>
     <div class:hidden={tab !== 'relationships'}><RelationshipGraph /></div>
     <div class:hidden={tab !== 'dice'}><DiceTab /></div>

@@ -42,6 +42,7 @@
   let objectLayer; // InstancedMesh group for scattered props
   let objSeed = 1;
   let lastScatterKey = null;
+  let lastRev = 0; // tracks voxelUI.mapRev to reload when the Image Editor rewrites the map
   let env; // environment system (sky/time/season/weather/fog)
   let envMinute = $state(720); // live clock when animated
   let lastT = 0;
@@ -445,6 +446,7 @@
     window.addEventListener('keyup', onKeyUp);
 
     // Load persisted chunk (or start flat), then build + initial topview.
+    lastRev = get(voxelUI).mapRev || 0; // baseline so the reload effect only fires on real bumps
     loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
       chunk = loaded || createChunk(0, 0, 6, 0, get(voxelUI).mapSize || CHUNK);
       buildGrid(); // size may differ from the initial default
@@ -516,6 +518,21 @@
       objectLayer.userData.geoCache.clear();
       syncObjects();
     }
+  });
+
+  // Image Editor (another tab) rewrote the map → reload the chunk from IndexedDB + reframe.
+  $effect(() => {
+    const rev = $voxelUI.mapRev;
+    if (!renderer || rev === lastRev) return;
+    lastRev = rev;
+    loadChunk(get(voxelUI).mapId, 0, 0).then((loaded) => {
+      if (!loaded) return;
+      chunk = loaded;
+      buildGrid();
+      rebuild();
+      setPreset(get(voxelUI).cameraPreset);
+      scheduleTopview();
+    });
   });
 </script>
 

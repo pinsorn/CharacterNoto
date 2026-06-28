@@ -101,6 +101,21 @@ exporting a small init/update/dispose; the OVERSEER wires the few lines into Map
 - [x] L4 **voxel object editor** — `voxelProp.js` + `ObjectEditor.svelte` + `customProps` + objects.js resolver. DONE, E2E (saved 5-voxel prop → picker).
 - Released as **v3.9.0**.
 
+## Image Editor + large maps (v3.10, in progress)
+- **Image Editor** = new host-only tab + full-screen. Shared base image + per-layer override;
+  3 layers (Height/Biome/Object); resolution `R px = 1 voxel` → map size `N = clamp(maxDim/R, 8,
+  MAX_MAP_SIZE)`. 2D preview (per-layer + composite). Apply → `applyImageMap.js` writes the chunk
+  to IDB + appends objects + bumps `voxelUI.mapRev`; Map3DTab reloads on the bump (cross-tab).
+  `ImageEditor.svelte` (subagent) is pure-2D (no three), uses tested `imageTerrain.js`.
+- **Large-map RENDERING — phased (data already scales: height+biome ≈ 3 B/col, 75 MB @ 5000²;
+  only whole-map meshing doesn't scale):**
+  - now: single chunk, `MAX_MAP_SIZE=256` (one greedy mesh; 256 edits may lag, fine for imports).
+  - next (medium risk): **multi-chunk meshing** — tile the map into chunk sub-meshes, remesh only
+    dirty chunks, reuse the existing greedy mesher per chunk → ~512–1024. No streaming/LOD/workers.
+  - epic (high risk, confirm scope first): camera chunk load/unload + LOD + Worker meshing for
+    thousands² (true 5000²). This is deferred L1b in full — a dedicated engine project, NOT a
+    tail-of-session add. User said 5000² is aspirational ("อาจจะ"); pin the real target before building.
+
 ## File map (new)
 - `src/lib/voxel/types.js` — constants, factories, JSDoc schemas, MAP_EXTENT.
 - `src/lib/voxel/chunkStore.js` — IDB `voxelworld` per-chunk persistence.

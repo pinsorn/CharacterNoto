@@ -3,6 +3,23 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-06-28
+
+### Added / fixed — 3D Map review pass
+- **Adjustable map size** — pick a square side length (16–128) per map; the terrain, grid, camera
+  and topview rescale, and resizing preserves the overlapping region.
+- **Image → terrain** — upload an image and bake it into the map as a **height** layer
+  (brightness → elevation), a **biome** layer (colour → nearest biome), or an **object** layer
+  (dark pixels → scattered props).
+- **Imported token models** — give a token a 3D model (**GLB/GLTF, OBJ, STL**); it renders in
+  place of the pawn (normalized to stand on the surface). FBX deferred.
+- **Voxel Object Editor** — build custom voxel props in-app (layer-by-layer painter at adjustable
+  resolution, live preview); saved props join the scatter/hand-place library.
+- **Token rotation X/Y/Z** — set pitch/yaw/roll per token in the panel (was yaw-only).
+- **Fixed possession POV** — you can now look with **left _or_ right drag** (right matched the
+  build-mode orbit habit but did nothing) with pointer-capture; and exiting POV no longer leaves
+  the possessed token invisible.
+
 ## [3.8.0] - 2026-06-28
 
 ### Added — 3D Map (VoxelDND)

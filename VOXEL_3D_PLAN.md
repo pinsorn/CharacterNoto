@@ -96,10 +96,10 @@ exporting a small init/update/dispose; the OVERSEER wires the few lines into Map
       exit-POV invisible-pawn bug. (committed)
 - [x] L3 token rotation X/Y/Z in panel (pitch/facing/roll, degrees). (committed)
 - [x] L1 **map size customization** — per-map square `size` (16..128), `resizeChunk`. (committed)
-- [ ] L1 **image → terrain** (height/biome/object) — `imageTerrain.js` + panel (subagent B → integrating)
-- [ ] L3 **GLB/OBJ/STL token models** — `tokenModels.js` loader (subagent C → integrating)
-- [ ] L4 **voxel object editor** — `voxelProp.js` + `ObjectEditor.svelte` + `customProps` (subagent D → integrating)
-- Release the batch as v3.9.0 when all green + E2E.
+- [x] L1 **image → terrain** (height/biome/object) — `imageTerrain.js` + panel. DONE, E2E (hill PNG).
+- [x] L3 **GLB/OBJ/STL token models** — `tokenModels.js` loader + tokens.js render + panel import. DONE, E2E (cube.obj).
+- [x] L4 **voxel object editor** — `voxelProp.js` + `ObjectEditor.svelte` + `customProps` + objects.js resolver. DONE, E2E (saved 5-voxel prop → picker).
+- Released as **v3.9.0**.
 
 ## File map (new)
 - `src/lib/voxel/types.js` — constants, factories, JSDoc schemas, MAP_EXTENT.

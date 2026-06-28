@@ -128,5 +128,19 @@ const onLayers = { height: { on: true }, biome: { on: true }, object: { on: fals
   ok(past.objects.length === 0, 'past-edge cells → no objects');
 }
 
+// --- colour-keyed objects: a pixel's colour picks the prop (OBJECT_KEYS) ----
+{
+  const objLayer = { height: { on: false }, biome: { on: false }, object: { on: true, density: 1 } };
+  const propOf = (rgb) => chunkFromImage(solid(8, 8, rgb), 0, 0, 4, 1, objLayer).objects[0]?.propId;
+  ok(propOf([0x2e, 0xcc, 0x40]) === 'tree', 'green key → tree');
+  ok(propOf([0x0a, 0x6b, 0x4a]) === 'pine', 'teal key → pine');
+  ok(propOf([0xcc, 0x33, 0xff]) === 'crystal', 'magenta key → crystal');
+  ok(propOf([0x9b, 0x9b, 0x9b]) === 'rock', 'grey key → rock');
+  ok(propOf([0x30, 0xc0, 0x44]) === 'tree', 'near-green → tree (nearest-match tolerance)');
+  ok(chunkFromImage(solid(8, 8, [255, 255, 255]), 0, 0, 4, 1, objLayer).objects.length === 0, 'white background → no objects');
+  const full = chunkFromImage(solid(8, 8, [0x2e, 0xcc, 0x40]), 0, 0, 4, 1, objLayer);
+  ok(full.objects.length === 16 && full.objects.every((o) => o.propId === 'tree'), 'density 1 → every cell, all tree');
+}
+
 console.log(`imageChunker: ${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -2,7 +2,7 @@
 // Input image is a plain `{ width, height, data }` where `data` is an RGBA Uint8ClampedArray
 // (length width*height*4) — i.e. a Canvas ImageData. The Svelte panel does the canvas/getImageData;
 // this module only crunches numbers. Cells are row-major: index = z*size + x.
-import { BIOMES, WORLD_HEIGHT, hex } from './types.js';
+import { BIOMES, WORLD_HEIGHT, hex, objectPropForColor } from './types.js';
 
 /**
  * Nearest-area downsample (also upscales) an image to size×size, returning average RGB (0..255).
@@ -95,28 +95,29 @@ function hash2(x, z) {
 const TAU = Math.PI * 2;
 
 /**
- * Dark cells (vegetation) → scattered prop instances. Deterministic: same input → same output.
+ * Colour-keyed cells → scattered prop instances: each cell's colour picks WHICH prop via
+ * OBJECT_KEYS (nearest-match; background → none), gated by `density`. Deterministic.
  * @param {{width:number,height:number,data:Uint8ClampedArray}} img
  * @param {number} size
- * @param {{propId?:string,threshold?:number,density?:number,heightAt?:(gx:number,gz:number)=>number}} [opts]
+ * @param {{density?:number,heightAt?:(gx:number,gz:number)=>number}} [opts]
  * @returns {Array<{propId:string,pos:{x:number,y:number,z:number},yaw:number,scale:number,seed:number}>}
  */
 export function imageToObjects(img, size, opts = {}) {
-  const { propId = 'tree', threshold = 0.5, density = 0.4, heightAt = () => 1 } = opts;
+  const { density = 0.4, heightAt = () => 1 } = opts;
   const rgb = sampleResize(img, size);
   const out = [];
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const o = (z * size + x) * 3;
-      const lum = lum601(rgb[o], rgb[o + 1], rgb[o + 2]) / 255;
-      if (lum >= threshold) continue; // only dark = vegetation
+      const pid = objectPropForColor(rgb[o], rgb[o + 1], rgb[o + 2]); // colour → prop (null = none)
+      if (!pid) continue;
       const h = hash2(x, z);
       // bit-slice the single hash for gate / yaw / scale (all derived "from the hash")
       const gate = (h & 0xffff) / 0x10000;
       if (gate >= density) continue;
       const yaw = (((h >>> 16) & 0xff) / 0x100) * TAU;
       const scale = 0.8 + (((h >>> 24) & 0xff) / 0x100) * 0.4; // 0.8..1.2
-      out.push({ propId, pos: { x: x + 0.5, y: heightAt(x, z), z: z + 0.5 }, yaw, scale, seed: h });
+      out.push({ propId: pid, pos: { x: x + 0.5, y: heightAt(x, z), z: z + 0.5 }, yaw, scale, seed: h });
     }
   }
   return out;

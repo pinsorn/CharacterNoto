@@ -41,6 +41,9 @@ async function generateChunked({ N, R, layers, imgs }) {
   const wChunks = Math.ceil(N / DIM);
   const hChunks = Math.ceil(N / DIM);
   const objects = [];
+  // Spread the object budget across chunks so a huge map isn't front-loaded (all objects in the
+  // first chunk-rows, invisible from the centre). Each chunk gets an equal share of MAX_OBJECTS.
+  const perChunkObjects = Math.max(8, Math.floor(MAX_OBJECTS / (wChunks * hChunks)));
 
   // incremental top-down raster (bounded), splatted as each chunk is generated
   const TW = Math.min(N, 512);
@@ -57,8 +60,9 @@ async function generateChunked({ N, R, layers, imgs }) {
         ? chunkFromImage(imgs.biome, cx, cz, DIM, R, { height: { on: false }, biome: { on: true }, object: { on: false } }).biome
         : new Uint8Array(DIM * DIM);
       if (layers.object.on && objects.length < MAX_OBJECTS) {
-        const o = chunkFromImage(imgs.object, cx, cz, DIM, R, { height: { on: false }, biome: { on: false }, object: { on: true, propId: layers.object.propId, threshold: layers.object.threshold, density: layers.object.density } }).objects;
-        for (const inst of o) { if (objects.length >= MAX_OBJECTS) break; objects.push(inst); }
+        const o = chunkFromImage(imgs.object, cx, cz, DIM, R, { height: { on: false }, biome: { on: false }, object: { on: true, density: layers.object.density } }).objects;
+        let placed = 0;
+        for (const inst of o) { if (placed >= perChunkObjects || objects.length >= MAX_OBJECTS) break; objects.push(inst); placed++; }
       }
       await saveChunk(mapId, { cx, cz, height, biome, overrides: new Map(), carves: new Set() });
 

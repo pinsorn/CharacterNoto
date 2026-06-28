@@ -171,3 +171,62 @@ export function meshChunk({ height, biome, dim = CHUNK_DIM, overrides, carves, a
     faces,
   };
 }
+
+/**
+ * Far-LOD mesher: a gap-free column surface. Per column emit the top quad at y=height plus, for each
+ * of the 4 neighbours whose terrain is LOWER, ONE merged "skirt" quad covering the exposed cliff
+ * y∈[neighbourHeight, height] (a single quad, not per-voxel). Iterates only the dim² columns (not the
+ * full voxel grid) and ignores overrides/carves — far chunks read as smooth voxel terrain. Boundary
+ * neighbours come from the same `aprons` edge-heights the full mesher uses (null apron = map edge =
+ * skirt down to 0, matching the full mesher's edge cliff). Top = surface colour, skirt = sub colour.
+ *
+ * @param {{height:Int16Array, biome:Uint8Array, dim?:number,
+ *   aprons?:{px?:Int16Array|null,nx?:Int16Array|null,pz?:Int16Array|null,nz?:Int16Array|null}}} job
+ * @returns {{positions:Float32Array, normals:Float32Array, colors:Float32Array, indices:Uint32Array, faces:number}}
+ */
+export function meshChunkSurface({ height, biome, dim = CHUNK_DIM, aprons } = {}) {
+  const D = dim;
+  const ap = aprons || {};
+  const apx = ap.px || null, anx = ap.nx || null, apz = ap.pz || null, anz = ap.nz || null;
+  const positions = [], normals = [], colors = [], indices = [];
+  let vcount = 0, faces = 0;
+  const clampH = (h) => (h < 0 ? 0 : h > WORLD_HEIGHT ? WORLD_HEIGHT : h);
+
+  function quad(p0, p1, p2, p3, nx, ny, nz, key) {
+    const c = colorOf(key);
+    for (const p of [p0, p1, p2, p3]) { positions.push(p[0], p[1], p[2]); normals.push(nx, ny, nz); colors.push(c[0], c[1], c[2]); }
+    indices.push(vcount, vcount + 1, vcount + 2, vcount, vcount + 2, vcount + 3);
+    vcount += 4; faces++;
+  }
+
+  for (let lz = 0; lz < D; lz++) {
+    for (let lx = 0; lx < D; lx++) {
+      const col = lz * D + lx;
+      const h = clampH(height[col]);
+      if (h <= 0) continue;
+      const b = biome[col];
+      const sKey = surfaceKey(b), subK = subKey(b);
+      const x0 = lx, x1 = lx + 1, z0 = lz, z1 = lz + 1;
+      // top
+      quad([x0, h, z0], [x0, h, z1], [x1, h, z1], [x1, h, z0], 0, 1, 0, sKey);
+      // neighbour heights (interior cell, else apron edge, else 0 = map-edge cliff)
+      const npx = lx + 1 < D ? clampH(height[col + 1]) : apx ? clampH(apx[lz]) : 0;
+      const nnx = lx - 1 >= 0 ? clampH(height[col - 1]) : anx ? clampH(anx[lz]) : 0;
+      const npz = lz + 1 < D ? clampH(height[col + D]) : apz ? clampH(apz[lx]) : 0;
+      const nnz = lz - 1 >= 0 ? clampH(height[col - D]) : anz ? clampH(anz[lx]) : 0;
+      // skirts only where the neighbour is lower (one quad spanning the exposed cliff)
+      if (npx < h) quad([x1, npx, z0], [x1, h, z0], [x1, h, z1], [x1, npx, z1], 1, 0, 0, subK);
+      if (nnx < h) quad([x0, nnx, z0], [x0, nnx, z1], [x0, h, z1], [x0, h, z0], -1, 0, 0, subK);
+      if (npz < h) quad([x0, npz, z1], [x1, npz, z1], [x1, h, z1], [x0, h, z1], 0, 0, 1, subK);
+      if (nnz < h) quad([x0, nnz, z0], [x0, h, z0], [x1, h, z0], [x1, nnz, z0], 0, 0, -1, subK);
+    }
+  }
+
+  return {
+    positions: Float32Array.from(positions),
+    normals: Float32Array.from(normals),
+    colors: Float32Array.from(colors),
+    indices: Uint32Array.from(indices),
+    faces,
+  };
+}

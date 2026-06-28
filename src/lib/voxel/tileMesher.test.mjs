@@ -1,8 +1,8 @@
 // Runnable check for the seam-correct per-chunk mesher: node src/lib/voxel/tileMesher.test.mjs
 // No framework — counts passes and prints `tileMesher: N passed, 0 failed`.
 // THE SEAM TEST IS THE GATE.
-import { meshChunk } from './tileMesher.js';
-import { surfaceKey, blockKey, colorOf } from './types.js';
+import { meshChunk, meshChunkSurface } from './tileMesher.js';
+import { surfaceKey, subKey, blockKey, colorOf } from './types.js';
 
 let passed = 0;
 let failed = 0;
@@ -145,6 +145,31 @@ const H = 4;
   // Empty column (height 0); override places a floating voxel at y=5.
   const mesh = meshChunk({ height: Int16Array.of(0), biome: Uint8Array.of(0), dim: 1, overrides: new Map([['0,5,0', 2]]) });
   eq(mesh.faces, 6, 'override: adds a floating voxel where terrain is empty → 6 faces');
+}
+
+// --- far-LOD column-surface mesher: gap-free top + skirts only where a neighbour is lower -----
+{
+  // single raised column (h=4) in a 3×3 of height 0 → top + 4 full skirts (all neighbours lower) = 5 faces
+  const h = new Int16Array(9), b = new Uint8Array(9);
+  h[1 * 3 + 1] = 4;
+  const m = meshChunkSurface({ height: h, biome: b, dim: 3 });
+  eq(m.faces, 5, 'surface: lone column → top + 4 skirts = 5 faces (height-0 cells emit nothing)');
+
+  // two adjacent columns h=5 and h=2 (rest 0): col5 = top+4 skirts(=5); col2 = top + 3 skirts (no skirt
+  // toward the taller col5) = 4 → 9 faces total. Verifies skirts only emit toward LOWER neighbours.
+  const h2 = new Int16Array(9), b2 = new Uint8Array(9);
+  h2[1 * 3 + 1] = 5; h2[1 * 3 + 2] = 2; // (1,1)=5, (2,1)=2
+  const m2 = meshChunkSurface({ height: h2, biome: b2, dim: 3 });
+  eq(m2.faces, 9, 'surface: tall+short neighbours → skirt only on the downhill side');
+
+  // top face uses surface colour, skirt uses sub colour
+  rgbApprox(m.colors, colorOf(surfaceKey(0)), 'surface: top quad = biome surface colour');
+  rgbApprox(m.colors.subarray(12), colorOf(subKey(0)), 'surface: skirt quad = biome sub colour');
+
+  // apron edge: a 1×1 chunk h=3 with a +x neighbour edge-height 1 → top + skirts where lower.
+  // -x/+z/-z aprons null (map edge → height 0 → skirt to 0); +x apron=1 → skirt 1..3. All 4 sides lower → 5 faces.
+  const ma = meshChunkSurface({ height: Int16Array.of(3), biome: Uint8Array.of(0), dim: 1, aprons: { px: Int16Array.of(1) } });
+  eq(ma.faces, 5, 'surface: apron edge-height drives the boundary skirt (neighbour lower → skirt)');
 }
 
 console.log(`tileMesher: ${passed} passed, ${failed} failed`);

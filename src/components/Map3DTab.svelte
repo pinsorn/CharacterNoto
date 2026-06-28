@@ -47,7 +47,8 @@
   let bigMap = $state(false); // chunked map (> single-chunk size): rendered via streaming ChunkManager
   let manager = null; // ChunkManager for chunked maps (null = small single-chunk map)
   let bigTokensSynced = false; // re-snap tokens once the streaming window first meshes
-  const VIEW_RADIUS = 2; // Chebyshev chunk radius kept loaded around the camera target (5×5 = 320²)
+  // Streaming render distance (chunks): near 2 stay full voxel detail, beyond = far-LOD surface.
+  const viewRadius = () => get(voxelUI).viewDist || 6;
   let env; // environment system (sky/time/season/weather/fog)
   let envMinute = $state(720); // live clock when animated
   let lastT = 0;
@@ -211,7 +212,7 @@
     controls.target.set(gx + 0.5, 0, gz + 0.5);
     camera.position.set(gx + 0.5 + d, d, gz + 0.5 + d);
     controls.update();
-    if (manager) { manager.setView(gx + 0.5, gz + 0.5, VIEW_RADIUS); setTimeout(syncTokens, 400); } // stream + re-snap height
+    if (manager) { manager.setView(gx + 0.5, gz + 0.5, viewRadius()); setTimeout(syncTokens, 400); } // stream + re-snap height
   }
   function rotateSelected(delta) {
     if (!selectedTokenId) return;
@@ -410,7 +411,7 @@
     const cx = manager.extentX / 2, cz = manager.extentZ / 2;
     controls.target.set(cx, 0, cz);
     setPreset(get(voxelUI).cameraPreset);
-    manager.setView(cx, cz, VIEW_RADIUS);
+    manager.setView(cx, cz, viewRadius());
   }
   // Leave streaming mode (a big map was replaced by a small single-chunk one).
   function teardownBigMap() {
@@ -538,7 +539,7 @@
       else controls.update();
       if (env) envMinute = env.update(dt, get(voxelEnv)).minuteOfDay;
       if (manager) {
-        manager.setView(controls.target.x, controls.target.z, VIEW_RADIUS); // stream chunks around the orbit target
+        manager.setView(controls.target.x, controls.target.z, viewRadius()); // stream chunks around the orbit target
         if (!bigTokensSynced && manager.loadedCount() > 0) { bigTokensSynced = true; syncTokens(); } // snap once meshed
       }
       if (dirtyMesh) { rebuild(); dirtyMesh = false; }
@@ -631,6 +632,14 @@
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'top' ? 'btn-active' : ''}" onclick={() => setPreset('top')}>Top</button>
     </div>
     <button class="btn btn-xs btn-ghost" onclick={() => (fs = !fs)}>{fs ? '⤡ Exit full screen' : '⤢ Full screen'}</button>
+    {#if bigMap}
+      <label class="flex items-center gap-1 text-xs" title="How far the streamed map renders (far chunks use a cheaper LOD surface)">View
+        <select class="select select-xs select-bordered" value={$voxelUI.viewDist}
+          onchange={(e) => { voxelUI.update((u) => ({ ...u, viewDist: +e.target.value })); if (manager) manager.lastCenter = null; }}>
+          {#each [3, 5, 8, 12] as d}<option value={d}>{d * 2 + 1}×{d * 2 + 1} chunks</option>{/each}
+        </select>
+      </label>
+    {/if}
     {#if !bigMap}
       <label class="flex items-center gap-1 text-xs">Size
         <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>

@@ -3,6 +3,15 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.14.0] - 2026-06-29
+
+### Added
+- **Far-distance rendering (LOD) for streamed maps** — the 3D Map now renders a much larger area at
+  once. Chunks within 2 of the camera keep full voxel detail (editable); beyond that they switch to a
+  cheaper **gap-free column-surface mesh** (top + cliff skirts) so a wide view stays responsive. A new
+  **View** selector picks the render distance (7×7 / 11×11 / 17×17 / **25×25** chunks); LOD updates as
+  you pan. Heights/edits/tokens stay exact at every distance.
+
 ## [3.13.0] - 2026-06-29
 
 ### Added

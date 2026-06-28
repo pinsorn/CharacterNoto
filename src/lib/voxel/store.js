@@ -15,6 +15,7 @@ export const voxelUI = persisted('voxelUI', {
   biomeId: 0,
   blockId: 1,
   cameraPreset: 'iso', // iso | top
+  viewDist: 6, // streaming render distance in chunks (far-LOD radius); near 2 chunks stay full detail
 });
 
 // Object painter (spec §9): scatter / hand-place props on the terrain.

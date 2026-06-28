@@ -8,7 +8,7 @@
 // big maps is deferred (P2 gate = render + pan); only the render/stream loop lives here.
 import { CHUNK_DIM, lidx, chunkKey, chunksInRadius, worldToChunk } from '../../lib/voxel/chunkGrid.js';
 import { loadChunk, saveChunk } from '../../lib/voxel/chunkStore.js';
-import { meshChunk } from '../../lib/voxel/tileMesher.js';
+import { meshChunk, meshChunkSurface } from '../../lib/voxel/tileMesher.js';
 import { createChunk as createScratch } from '../../lib/voxel/world.js';
 
 const MAX_JOBS_PER_FLUSH = 6; // cap dispatches/frame so a fresh window doesn't stall the main thread
@@ -39,6 +39,7 @@ export class ChunkManager {
     this.centerCX = 0;
     this.centerCZ = 0;
     this.radius = 0;
+    this.nearR = 2; // chunks within this Chebyshev radius render full voxel detail (editable); beyond = far-LOD surface
     this._initWorker();
   }
 
@@ -100,11 +101,23 @@ export class ChunkManager {
         if (!chunk) return; // empty cell (shouldn't happen for a generated map)
         // discard if the window moved past this chunk while IDB was resolving (Chebyshev, matches chunksInRadius)
         if (Math.abs(cx - this.centerCX) > this.radius || Math.abs(cz - this.centerCZ) > this.radius) return;
-        this.loaded.set(key, { chunk, mesh: null, jobId: 0 });
+        this.loaded.set(key, { chunk, mesh: null, jobId: 0, lodKey: null });
         this.dirty.add(key);
         this._dirtyNeighbours(cx, cz); // their apron toward the new chunk changed
       });
     }
+
+    // LOD: re-mesh any loaded chunk whose detail tier changed as the centre moved (near↔far).
+    for (const [key, e] of this.loaded) {
+      const [cx, cz] = key.split(',').map(Number);
+      if (this._lodKey(cx, cz) !== e.lodKey) this.dirty.add(key);
+    }
+  }
+
+  /** Detail tier for a chunk by its Chebyshev distance from the centre: 'full' (near) or 'surface' (far). */
+  _lodKey(cx, cz) {
+    const d = Math.max(Math.abs(cx - this.centerCX), Math.abs(cz - this.centerCZ));
+    return d <= this.nearR ? 'full' : 'surface';
   }
 
   /** Mark the 4 edge-neighbours dirty if they're loaded (apron across the shared edge changed). */
@@ -148,20 +161,18 @@ export class ChunkManager {
     const e = this.loaded.get(key);
     if (!e) return;
     const { cx, cz } = e.chunk;
+    const surfaceOnly = this._lodKey(cx, cz) === 'surface';
     const id = this.jobId++;
     e.jobId = id; // newest job for this key — older results are dropped as stale
-    const job = {
-      jobId: id, cx, cz, dim: this.dim,
-      height: e.chunk.height, biome: e.chunk.biome,
-      overrides: [...(e.chunk.overrides || [])],
-      carves: [...(e.chunk.carves || [])],
-      aprons: this._apronFor(cx, cz),
-    };
+    e.meshLodKey = surfaceOnly ? 'surface' : 'full'; // recorded onto e.lodKey when the result lands
+    const job = surfaceOnly
+      ? { jobId: id, cx, cz, dim: this.dim, height: e.chunk.height, biome: e.chunk.biome, aprons: this._apronFor(cx, cz), surfaceOnly: true }
+      : { jobId: id, cx, cz, dim: this.dim, height: e.chunk.height, biome: e.chunk.biome, overrides: [...(e.chunk.overrides || [])], carves: [...(e.chunk.carves || [])], aprons: this._apronFor(cx, cz) };
     if (this.worker) {
       this.jobs.set(id, key);
       this.worker.postMessage(job); // NO transfer list: keep height/biome on the chunk for heightAt/raycast
     } else {
-      this._onMesh({ jobId: id, cx, cz, ...meshChunk(job) }); // sync fallback
+      this._onMesh({ jobId: id, cx, cz, ...(surfaceOnly ? meshChunkSurface(job) : meshChunk(job)) }); // sync fallback
     }
   }
 
@@ -193,6 +204,7 @@ export class ChunkManager {
       e.mesh.userData.chunkKey = key;
       this.scene.add(e.mesh);
     }
+    e.lodKey = e.meshLodKey; // detail tier now reflected in the mesh
   }
 
   /** Surface top y at a global voxel cell (token snap). Loaded chunk → column height; else default. */

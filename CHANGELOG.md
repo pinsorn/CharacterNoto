@@ -3,6 +3,22 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.13.0] - 2026-06-29
+
+### Added
+- **Move a token to an exact spot** — type its **X/Z cell** in the Token panel, or (in Tokens mode)
+  **click the ground** with a token selected to move it there. New tokens now spawn at the current
+  view centre instead of a fixed corner, so they're visible on huge maps.
+- **Locate a token** — a **🎯** button (token list + edit panel) centres the 3D view on a token and
+  streams that area, so tokens are easy to find on large maps without hunting by drag.
+
+### Fixed
+- **Objects were buried on large (chunked) maps** — the streamed-generate object pass ran with the
+  height layer off, so every prop sat at y=1 (under the terrain) and looked like it vanished. Props
+  now sit on the actual terrain surface.
+- **Middle-drag pan no longer scrolls the web page** — the browser's middle-click autoscroll is
+  suppressed over the 3D Map canvas.
+
 ## [3.12.0] - 2026-06-28
 
 ### Added

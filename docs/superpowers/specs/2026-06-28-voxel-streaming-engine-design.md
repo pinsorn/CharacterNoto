@@ -120,9 +120,20 @@ The deferred render spine + P2 streaming window are built and verified on `feat/
   double walls iso+top (world-offset + apron correct). **Gate C** 640² (10×10): only **25/100** chunks
   loaded (radius-2 window); middle-drag pan recentred center chunk (5,5)→(6,3), window followed, stayed
   capped at 25 (old unload / new load), responsive, zero console errors. All 17 test suites green; build green.
-- **Deferred (lightly-verified):** terrain editing on big maps (cross-chunk brush write + apron-neighbour
-  re-mesh). Render + pan is the shipped P2 gate. Next: route `editAtWorld` for big-map terrain edits, then
-  consider LOD-lite for far chunks. Merge/release of the branch is a user decision.
+- **Big-map terrain EDITING — DONE & E2E-verified.** `ChunkManager.brushAtWorld` (scratch-region: a
+  small `size=2R+3` scratch chunk built across loaded chunks with a 1-cell read-only border, reuses
+  `brushes.applyBrush` unchanged, writes height+biome+carves back to owning loaded chunks) and
+  `editBlockAtWorld` (single voxel → owning chunk's overrides/carves). Map3DTab `applyAt` routes through
+  them; `flatten` baseline captured via `manager.heightAt` and threaded through the stroke; touched chunks
+  + apron-neighbours marked dirty (write-then-dirty) and debounce-saved via `manager.save()`. Footguns
+  handled: copy+writeback BOTH height & biome; loaded-only writeback; block-on-seam needs no neighbour
+  re-mesh (apron = height only). Verified E2E on 640²: a raise stroke straddling the x=320 seam raised
+  BOTH chunk(4,5)[63] and chunk(5,5)[0] identically (no clip), re-meshed live with no crack, persisted to
+  IDB, and survived an unload→reload pan round-trip (peak h=44 intact). `chunkManager.test.mjs` pins the
+  cross-chunk writeback (17/17).
+- **Still deferred (optional):** LOD-lite for far chunks (not needed — the radius-2 window keeps 5000²
+  responsive); live topview re-raster after big-map edits (the generate-time topview stays on the Map tab);
+  copying pre-existing in-region overrides into the carve scratch (rare). Feature is render+pan+edit complete.
 
 ## HANDOFF — the deferred spine (streaming RENDER in Map3DTab) + P2  [DONE — see STATUS above]
 Resume here. Build a `ChunkManager` (overseer-owned) and reroute Map3DTab off the single-chunk model.

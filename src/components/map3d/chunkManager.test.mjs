@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import { ChunkManager } from './chunkManager.js';
 import { CHUNK_DIM } from '../../lib/voxel/chunkGrid.js';
+import { applyBrush } from './brushes.js';
 
 const D = CHUNK_DIM;
 let pass = 0;
@@ -50,5 +51,24 @@ ok(edge.px !== null && edge.pz !== null, 'present neighbours still resolve');
 ok(m.heightAt(64, 64) === 0 * 100 + 0, 'heightAt routes global → chunk(1,1) local(0,0)');
 ok(m.heightAt(64 + 5, 64 + 7) === 5 * 100 + 7, 'heightAt local offset within chunk');
 ok(m.heightAt(64 * 9, 0) === 6, 'heightAt unloaded chunk → fallback 6');
+
+// --- cross-chunk brush writeback: a raise stroke straddling the (0,0)|(1,0) seam updates BOTH
+//     chunks and marks both dirty (the footgun a single-chunk path silently clips). ---
+const flat = (cx, cz) => ({ cx, cz, size: D, height: new Int16Array(D * D).fill(6), biome: new Uint8Array(D * D), overrides: new Map(), carves: new Set() });
+const m2 = new ChunkManager(noopScene, {}, 'm2', { wChunks: 2, hChunks: 1, dim: D });
+m2.loaded.set('0,0', { chunk: flat(0, 0), mesh: null, jobId: 0 });
+m2.loaded.set('1,0', { chunk: flat(1, 0), mesh: null, jobId: 0 });
+// radius-2 raise centred on global x=63,z=10 (last column of chunk 0) → footprint spans into chunk 1
+const touched = m2.brushAtWorld(63, 10, 2, (sc, lcx, lcz) =>
+  applyBrush(sc, lcx, lcz, { tool: 'raise', radius: 2, strength: 1, shape: 'circle', falloff: false }));
+const h0 = m2.loaded.get('0,0').chunk.height;
+const h1 = m2.loaded.get('1,0').chunk.height;
+ok(h0[10 * D + 63] === 7, 'chunk(0,0) seam column raised');
+ok(h1[10 * D + 0] === 7, 'chunk(1,0) seam column raised (cross-boundary)');
+ok(h1[10 * D + 1] === 7, 'chunk(1,0) +1 column raised');
+ok(h0[10 * D + 30] === 6, 'far column in chunk(0,0) untouched');
+ok(touched.has('0,0') && touched.has('1,0'), 'both chunks returned as touched');
+ok(m2.dirty.has('0,0') && m2.dirty.has('1,0'), 'both chunks marked dirty (re-mesh)');
+ok(m2.unsaved.has('0,0') && m2.unsaved.has('1,0'), 'both chunks queued for save');
 
 console.log(`chunkManager: ${pass} passed, 0 failed`);

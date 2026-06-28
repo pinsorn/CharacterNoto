@@ -143,27 +143,29 @@
 
   function applyAt(hit, start) {
     if (!hit) return;
-    if (manager) return; // chunked map: terrain edit routes across chunks — deferred (P2 gate = render+pan)
     const ui = get(voxelUI);
     const p = hit.point;
     const n = hit.face ? hit.face.normal : new THREE.Vector3(0, 1, 0);
     if (ui.tool === 'place' || ui.tool === 'erase') {
       const off = ui.tool === 'place' ? 0.5 : -0.5;
       const x = Math.floor(p.x + n.x * off), y = Math.floor(p.y + n.y * off), z = Math.floor(p.z + n.z * off);
-      if (ui.tool === 'place') placeBlock(chunk, x, y, z, ui.blockId);
-      else eraseVoxel(chunk, x, y, z);
-    } else {
-      const cx = clampCell(Math.floor(p.x - n.x * 0.01));
-      const cz = clampCell(Math.floor(p.z - n.z * 0.01));
-      if (start && ui.tool === 'flatten') strokeTargetH = chunk.height[colIdx(cx, cz)];
-      paintBrush(chunk, cx, cz, {
-        tool: ui.tool, radius: ui.brushRadius, strength: ui.brushStrength,
-        shape: ui.brushShape, falloff: ui.brushFalloff, target: ui.targetHeight,
-        biomeId: ui.biomeId, seed: strokeSeed,
-        baseline: ui.tool === 'flatten' ? strokeTargetH : undefined,
-      });
+      const edit = (ch, lx, ly, lz) => (ui.tool === 'place' ? placeBlock(ch, lx, ly, lz, ui.blockId) : eraseVoxel(ch, lx, ly, lz));
+      if (manager) manager.editBlockAtWorld(x, y, z, edit); // chunked map streams the re-mesh itself
+      else { edit(chunk, x, y, z); dirtyMesh = true; }
+      return;
     }
-    dirtyMesh = true;
+    const cx = clampCell(Math.floor(p.x - n.x * 0.01));
+    const cz = clampCell(Math.floor(p.z - n.z * 0.01));
+    // flatten: one shared baseline for the whole stroke (chunked → read via manager, not the dead chunk).
+    if (start && ui.tool === 'flatten') strokeTargetH = manager ? manager.heightAt(cx, cz) : chunk.height[colIdx(cx, cz)];
+    const opts = {
+      tool: ui.tool, radius: ui.brushRadius, strength: ui.brushStrength,
+      shape: ui.brushShape, falloff: ui.brushFalloff, target: ui.targetHeight,
+      biomeId: ui.biomeId, seed: strokeSeed,
+      baseline: ui.tool === 'flatten' ? strokeTargetH : undefined,
+    };
+    if (manager) manager.brushAtWorld(cx, cz, ui.brushRadius, (sc, lcx, lcz) => paintBrush(sc, lcx, lcz, opts));
+    else { paintBrush(chunk, cx, cz, opts); dirtyMesh = true; }
   }
 
   function setNdc(e) {
@@ -307,7 +309,7 @@
 
   function scheduleSave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveChunk(get(voxelUI).mapId, chunk), 500);
+    saveTimer = setTimeout(() => (manager ? manager.save() : saveChunk(get(voxelUI).mapId, chunk)), 500);
   }
   function scheduleTopview() {
     clearTimeout(topTimer);

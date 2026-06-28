@@ -7,8 +7,9 @@
 // Big-map only — small maps keep the single-chunk path in Map3DTab. Terrain EDIT on
 // big maps is deferred (P2 gate = render + pan); only the render/stream loop lives here.
 import { CHUNK_DIM, lidx, chunkKey, chunksInRadius, worldToChunk } from '../../lib/voxel/chunkGrid.js';
-import { loadChunk } from '../../lib/voxel/chunkStore.js';
+import { loadChunk, saveChunk } from '../../lib/voxel/chunkStore.js';
 import { meshChunk } from '../../lib/voxel/tileMesher.js';
+import { createChunk as createScratch } from '../../lib/voxel/world.js';
 
 const MAX_JOBS_PER_FLUSH = 6; // cap dispatches/frame so a fresh window doesn't stall the main thread
 
@@ -33,6 +34,7 @@ export class ChunkManager {
     this.dirty = new Set();    // keys needing (re)mesh
     this.jobs = new Map();     // jobId -> key (worker round-trips)
     this.jobId = 1;
+    this.unsaved = new Set();  // touched chunk keys awaiting a debounced saveChunk()
     this.lastCenter = null;    // "ccx,ccz" so setView only re-windows when the centre chunk moves
     this.centerCX = 0;
     this.centerCZ = 0;
@@ -214,6 +216,98 @@ export class ChunkManager {
   }
 
   loadedCount() { return this.loaded.size; }
+
+  // --- editing (big-map terrain) -------------------------------------------
+  // height/biome (+sub-key) of a global column from its loaded chunk, or null (unloaded/out of map).
+  _columnAt(gx, gz) {
+    if (gx < 0 || gz < 0 || gx >= this.extentX || gz >= this.extentZ) return null;
+    const { cx, cz, lx, lz } = worldToChunk(gx, gz);
+    const e = this.loaded.get(chunkKey(cx, cz));
+    if (!e) return null;
+    const i = lidx(lx, lz);
+    return { h: e.chunk.height[i], b: e.chunk.biome[i] };
+  }
+  // Write a column's height+biome back to its owning LOADED chunk (drop if unloaded/out of map).
+  _writeColumn(gx, gz, h, b, touched) {
+    if (gx < 0 || gz < 0 || gx >= this.extentX || gz >= this.extentZ) return;
+    const { cx, cz, lx, lz } = worldToChunk(gx, gz);
+    const key = chunkKey(cx, cz);
+    const e = this.loaded.get(key);
+    if (!e) return;
+    const i = lidx(lx, lz);
+    e.chunk.height[i] = h;
+    e.chunk.biome[i] = b;
+    touched.add(key);
+  }
+  _writeCarve(gx, ay, gz, touched) {
+    const { cx, cz, lx, lz } = worldToChunk(gx, gz);
+    const key = chunkKey(cx, cz);
+    const e = this.loaded.get(key);
+    if (!e) return;
+    e.chunk.carves.add(`${lx},${ay},${lz}`); // chunk-LOCAL x,z; ABSOLUTE y
+    touched.add(key);
+  }
+
+  /**
+   * Apply a radius brush centred on global cell (gx,gz). `runBrush(scratch, lcx, lcz)` runs the
+   * actual stamp (caller closes over tool/opts) on a scratch chunk built over the affected bbox.
+   * Reuses brushes.applyBrush unchanged — boundary continuity (smooth/falloff) is preserved because
+   * the scratch spans across chunk seams with a 1-cell read-only border.
+   */
+  brushAtWorld(gx, gz, radius, runBrush) {
+    const R = Math.max(0, radius | 0);
+    const S = 2 * R + 3;                 // +1 border each side (smooth reads ±1 outside the footprint)
+    const ox = gx - R - 1, oz = gz - R - 1;
+    const sc = createScratch(0, 0, 6, 0, S); // real chunk shape (size=S), defaults where neighbours absent
+    for (let lz = 0; lz < S; lz++) for (let lx = 0; lx < S; lx++) {
+      const src = this._columnAt(ox + lx, oz + lz);
+      if (src) { sc.height[lz * S + lx] = src.h; sc.biome[lz * S + lx] = src.b; }
+    }
+    runBrush(sc, R + 1, R + 1);
+    // write the brush-writable inner region (border is context only) — heights FIRST, dirty after.
+    const touched = new Set();
+    for (let lz = 1; lz < S - 1; lz++) for (let lx = 1; lx < S - 1; lx++) {
+      this._writeColumn(ox + lx, oz + lz, sc.height[lz * S + lx], sc.biome[lz * S + lx], touched);
+    }
+    for (const k of sc.carves) { // carve tool: translate scratch-local key → global → chunk-local
+      const [slx, sy, slz] = k.split(',').map(Number);
+      this._writeCarve(ox + slx, sy, oz + slz, touched);
+    }
+    this._touch(touched);
+    return touched;
+  }
+
+  /** Place/erase a single block voxel at a global (gx,gy,gz). `fn(chunk, lx, gy, lz)` mutates it. */
+  editBlockAtWorld(gx, gy, gz, fn) {
+    if (gx < 0 || gz < 0 || gx >= this.extentX || gz >= this.extentZ) return;
+    const { cx, cz, lx, lz } = worldToChunk(gx, gz);
+    const key = chunkKey(cx, cz);
+    const e = this.loaded.get(key);
+    if (!e) return;
+    fn(e.chunk, lx, gy, lz);
+    // apron uses neighbour HEIGHT only, so a block on a seam needs no neighbour re-mesh.
+    this.dirty.add(key);
+    this.unsaved.add(key);
+  }
+
+  // Mark touched chunks (and their apron-neighbours) dirty, and queue them for save.
+  _touch(keys) {
+    for (const key of keys) {
+      this.dirty.add(key);
+      this.unsaved.add(key);
+      const [cx, cz] = key.split(',').map(Number);
+      this._dirtyNeighbours(cx, cz);
+    }
+  }
+
+  /** Persist all chunks edited since the last save. */
+  save() {
+    for (const key of this.unsaved) {
+      const e = this.loaded.get(key);
+      if (e) saveChunk(this.mapId, e.chunk);
+    }
+    this.unsaved.clear();
+  }
 
   _disposeMesh(e) {
     if (e?.mesh) {

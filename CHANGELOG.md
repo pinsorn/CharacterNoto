@@ -3,6 +3,37 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-06-28
+
+### Added — 3D Map (VoxelDND)
+A new host-only **3D Map** tab: a streaming-ready voxel world builder adapted from the
+VoxelDND spec into the app's Svelte 5 + three.js stack. The old **Map** tab keeps its
+freeform regions but no longer takes an uploaded image — its background is now the
+auto-generated top-down render of the 3D Map (so it stays in sync, and players still get it
+over P2P + in the zip backup, unchanged).
+
+- **Voxel terrain engine (L1):** chunked heightmap + biome + block-overrides + carves, a greedy
+  mesher (merges coplanar faces), per-chunk IndexedDB persistence, perspective + OrbitControls
+  with ISO/Top presets. Raycast edit loop.
+- **World Painter (L2):** Raise / Lower / Flatten / Smooth / Roughen / Set-Height / Carve +
+  Paint Biome, with circle/square brush, radius/strength and optional falloff; plus single-voxel
+  Place / Erase block tools.
+- **Tokens (L3):** drop **characters or generic markers** as 3D pawns (initial + colour + facing
+  notch + billboard label), drag to move (grid-snap, surface-snap), Q/E rotate, sizes
+  tiny→gargantuan, and **possession** — a cosmetic first-person POV from a token (drag-look,
+  WASD/arrows, Esc). Tokens persist in the map and appear in the topview so players see who/what
+  is where.
+- **Object system (L4):** a built-in prop library (pine, tree, bush, rock, boulder, stump,
+  crystal) with a **scatter brush + hand-place** painter, rendered with InstancedMesh.
+- **Environment (L6):** day/night with a real sky + sun, season tint, moon-lit stars, weather
+  (rain/snow/storm particles), and atmospheric fog — static or animated time.
+- The 3D Map is host-only authoring; the resulting topview + regions are what players see on the
+  shared Map tab.
+
+Deferred (roadmap in `VOXEL_3D_PLAN.md`): chunk streaming/Workers/LOD + 1 ft resolution,
+QuickJS-sandboxed programmable materials, capped real point-lights, water volumes + flood,
+destruction physics, multi-map browser, STL export.
+
 ## [3.7.1] - 2026-06-27
 
 ### Fixed

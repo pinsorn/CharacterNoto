@@ -104,7 +104,27 @@ multiplayer streaming of chunks. Keep cosmetic POV, regions, tokens, objects wor
   capped at 20000, `mapRev++`. ≤256 still single-chunk (3D-editable, unchanged). Map3DTab shows a
   "Large chunked map" note for chunked maps. **Verified E2E: 640×640 → 100 chunks, topview on Map tab.**
 
-## HANDOFF — the deferred spine (streaming RENDER in Map3DTab) + P2
+## STATUS (2026-06-28) — STREAMING SPINE + P2 DONE & E2E-VERIFIED (branch only; main still v3.10.0)
+The deferred render spine + P2 streaming window are built and verified on `feat/streaming-engine`.
+- `src/components/map3d/chunkManager.js` (overseer-owned, **big-map only**): load/unload chunks in a
+  Chebyshev camera-target radius, mesh each in `meshWorker` (apron from loaded neighbours, world-offset
+  to `(cx*DIM,0,cz*DIM)`), main-thread `meshChunk` fallback, stale-job guard per chunk, capped dispatch/
+  frame. API: `setView/heightAt/raycastTargets/getChunk/loadedCount/dispose`. Input arrays are NOT
+  transferred (kept on the chunk for heightAt/raycast). Unit check: `chunkManager.test.mjs` pins apron
+  orientation + heightAt (10/10).
+- **Hybrid, not unified** (advisor-reversed): the shipped small-map single-chunk path is UNTOUCHED
+  (greedy mesh, full editing). Only chunked (big) maps route through ChunkManager. Map3DTab: `heightAt`
+  + `pick` route to the manager on big maps; tick drives `setView(controls.target, RADIUS=2)`; tokens/
+  objects ride along (heightAt + raycast); terrain BRUSH edits guarded off on big maps (deferred).
+- Verified E2E (Playwright, dev server): **Gate B** 320² (5×5) renders continuous — no seam cracks /
+  double walls iso+top (world-offset + apron correct). **Gate C** 640² (10×10): only **25/100** chunks
+  loaded (radius-2 window); middle-drag pan recentred center chunk (5,5)→(6,3), window followed, stayed
+  capped at 25 (old unload / new load), responsive, zero console errors. All 17 test suites green; build green.
+- **Deferred (lightly-verified):** terrain editing on big maps (cross-chunk brush write + apron-neighbour
+  re-mesh). Render + pan is the shipped P2 gate. Next: route `editAtWorld` for big-map terrain edits, then
+  consider LOD-lite for far chunks. Merge/release of the branch is a user decision.
+
+## HANDOFF — the deferred spine (streaming RENDER in Map3DTab) + P2  [DONE — see STATUS above]
 Resume here. Build a `ChunkManager` (overseer-owned) and reroute Map3DTab off the single-chunk model.
 **Parity at one chunk FIRST** (must render/edit/topview identically at small size) before load/unload.
 

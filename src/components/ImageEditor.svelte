@@ -250,7 +250,7 @@
           <div class="text-xs opacity-70">
             Source {baseImg.width}×{baseImg.height}px → <span class="font-semibold">{N}×{N} map</span>
             {#if big}
-              <div class="text-info mt-1">large map → auto-split into {Math.ceil(N / 64)}×{Math.ceil(N / 64)} chunks. Top-down view shows on the Map tab (full 3D streaming view coming).</div>
+              <div class="text-info mt-1">large map → auto-split into {Math.ceil(N / 64)}×{Math.ceil(N / 64)} chunks. The 3D Map streams it around the camera; the Map tab shows the top-down view.</div>
             {/if}
           </div>
         {/if}

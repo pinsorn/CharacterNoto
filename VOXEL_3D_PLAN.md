@@ -101,7 +101,7 @@ exporting a small init/update/dispose; the OVERSEER wires the few lines into Map
 - [x] L4 **voxel object editor** — `voxelProp.js` + `ObjectEditor.svelte` + `customProps` + objects.js resolver. DONE, E2E (saved 5-voxel prop → picker).
 - Released as **v3.9.0**.
 
-## Image Editor + large maps (v3.10, in progress)
+## Image Editor + large maps (v3.10.0 — DONE, verified E2E)
 - **Image Editor** = new host-only tab + full-screen. Shared base image + per-layer override;
   3 layers (Height/Biome/Object); resolution `R px = 1 voxel` → map size `N = clamp(maxDim/R, 8,
   MAX_MAP_SIZE)`. 2D preview (per-layer + composite). Apply → `applyImageMap.js` writes the chunk

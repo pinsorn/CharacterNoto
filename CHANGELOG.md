@@ -3,6 +3,21 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.0] - 2026-06-28
+
+### Added — Image Editor
+- A dedicated host-only **Image Editor** tab (with a **full-screen** mode) that turns an uploaded
+  image into a voxel map across **three layers** with a live 2D preview:
+  - **Height** (brightness → elevation, max-height + invert), **Biome** (pixel colour → nearest
+    biome, with a legend), **Object** (dark pixels → scattered prop; prop / threshold / density).
+  - A **shared base image** plus an optional **per-layer override** image.
+  - **Resolution**: choose `R px = 1 voxel`; the map size is computed as `maxDim / R`
+    (e.g. a 96 px image at 1 px/voxel → a 96×96 map), capped at 256 for now.
+  - Per-layer previews + a composite top-down preview; **Apply** writes the map (the 3D Map tab
+    reloads automatically).
+- **Adjustable map size up to 256** (single chunk). Larger maps (≈1024 via multi-chunk meshing,
+  and thousands² via streaming + LOD) are a planned engine phase — see `VOXEL_3D_PLAN.md`.
+
 ## [3.9.0] - 2026-06-28
 
 ### Added / fixed — 3D Map review pass

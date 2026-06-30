@@ -63,11 +63,22 @@
   const ndc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
 
-  let mode = $state('terrain'); // 'terrain' | 'tokens'
+  // mode persisted in voxelUI (read defensively — persisted() doesn't merge defaults for old users)
+  let mode = $state(get(voxelUI).mode ?? 'terrain'); // 'terrain' | 'tokens' | 'objects'
+  function setMode(m) { mode = m; voxelUI.update((u) => ({ ...u, mode: m })); }
   let fs = $state(false); // full-screen the whole 3D Map tab
   let selectedTokenId = $state(null);
   let possessing = $state(false);
   const look = { yaw: 0, pitch: 0, dragging: false, px: 0, py: 0 };
+
+  // Live control legend per mode (mouse scheme is FIXED; the HUD only describes it).
+  const hudLines = $derived(
+    possessing ? ['POV', 'Drag = look', 'WASD / arrows = move', 'Esc = exit']
+    : mode === 'tokens' ? ['Tokens', 'Left-click = select', 'Drag / click ground = move', 'Right-drag orbit · Wheel zoom', 'Q/E rotate · Possess = POV']
+    : mode === 'objects' ? ['Objects', 'Left-drag = scatter / place', 'Right-drag orbit · Wheel zoom', 'Pick prop & params below']
+    : ['Terrain', 'Left-drag = edit', 'Right-drag = orbit', 'Middle-drag pan · Wheel zoom']
+  );
+  const canvasCursor = $derived(possessing ? 'cursor-grabbing' : mode === 'tokens' ? 'cursor-pointer' : 'cursor-crosshair');
 
   // token placement helpers — chunked maps read the streaming manager; small maps the dense cache.
   const heightAt = (gx, gz) => (manager ? manager.heightAt(gx, gz) : lastDense ? surfaceY(lastDense, gx, gz, chunk.size) : 6);
@@ -623,9 +634,9 @@
   <div class="flex flex-wrap gap-2 items-center mb-3">
     <h2 class="text-2xl font-bold mr-auto">3D Map</h2>
     <div class="join">
-      <button class="btn btn-xs join-item {mode === 'terrain' ? 'btn-active' : ''}" onclick={() => (mode = 'terrain')}>Terrain</button>
-      <button class="btn btn-xs join-item {mode === 'tokens' ? 'btn-active' : ''}" onclick={() => (mode = 'tokens')}>Tokens</button>
-      <button class="btn btn-xs join-item {mode === 'objects' ? 'btn-active' : ''}" onclick={() => (mode = 'objects')}>Objects</button>
+      <button class="btn btn-xs join-item {mode === 'terrain' ? 'btn-active' : ''}" onclick={() => setMode('terrain')}>Terrain</button>
+      <button class="btn btn-xs join-item {mode === 'tokens' ? 'btn-active' : ''}" onclick={() => setMode('tokens')}>Tokens</button>
+      <button class="btn btn-xs join-item {mode === 'objects' ? 'btn-active' : ''}" onclick={() => setMode('objects')}>Objects</button>
     </div>
     <div class="join">
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
@@ -641,13 +652,18 @@
       </label>
     {/if}
     {#if !bigMap}
-      <label class="flex items-center gap-1 text-xs">Size
-        <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
-          {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
-        </select>
-      </label>
-      <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
-      <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+      <div class="dropdown dropdown-end">
+        <button tabindex="0" class="btn btn-xs btn-ghost" aria-label="Map options">⋯ Map</button>
+        <div tabindex="0" class="dropdown-content z-10 menu bg-base-200 rounded-box shadow p-2 gap-2 w-48">
+          <label class="flex items-center justify-between gap-1 text-xs">Size
+            <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
+              {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
+            </select>
+          </label>
+          <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
+          <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+        </div>
+      </div>
     {/if}
   </div>
 
@@ -705,21 +721,36 @@
 
   {/if}
 
-  <div class="text-xs opacity-60 mb-2">
-    {#if possessing}POV — drag to look · WASD/arrows to move · Esc to exit
-    {:else if mode === 'tokens'}Tokens — click to select · drag OR click ground to move · type X/Z or 🎯 to locate · Q/E rotate · Possess for POV
-    {:else if mode === 'objects'}Objects — click/drag to scatter (or hand-place) props · pick prop & params below
-    {:else}Left-drag = edit · Right-drag = orbit · Wheel = zoom · Middle-drag = pan. Edits auto-save & refresh the Map tab topview.{/if}
-  </div>
-
   <div class="relative">
-    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style={fs ? 'height: calc(100vh - 200px);' : 'height: 460px;'}></div>
+    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300 {canvasCursor}" style={fs ? 'height: calc(100vh - 200px);' : 'height: 460px;'}></div>
     {#if possessing}
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
     {/if}
     {#if bigMap}
       <div class="absolute top-2 left-2 text-xs px-2 py-1 rounded bg-base-300/80 opacity-80 pointer-events-none">
         Streaming chunked map — right-drag to orbit · middle-drag to pan & explore
+      </div>
+    {/if}
+
+    <!-- Control legend HUD (mouse scheme is fixed — this just makes it discoverable) -->
+    <div class="absolute bottom-2 left-2 text-[11px] leading-tight rounded bg-base-300/85 shadow select-none">
+      <button class="flex items-center gap-1 px-2 py-1 font-semibold w-full text-left"
+        onclick={() => voxelUI.update((u) => ({ ...u, hudCollapsed: !($voxelUI.hudCollapsed ?? false) }))}
+        title="Toggle controls help">
+        <span>🎮 {hudLines[0]}</span>
+        <span class="opacity-60">{($voxelUI.hudCollapsed ?? false) ? '▸' : '▾'}</span>
+      </button>
+      {#if !($voxelUI.hudCollapsed ?? false)}
+        <div class="px-2 pb-1 opacity-80">
+          {#each hudLines.slice(1) as l}<div>{l}</div>{/each}
+        </div>
+      {/if}
+    </div>
+
+    {#if !($voxelUI.hintSeen ?? false)}
+      <div class="absolute bottom-16 left-2 max-w-[15rem] text-[11px] bg-info text-info-content rounded shadow px-2 py-1">
+        Tip: <b>Left-drag</b> edits · <b>Right-drag</b> orbits · <b>Middle-drag</b> pans. See 🎮 anytime.
+        <button class="btn btn-xs btn-ghost ml-1 underline" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
       </div>
     {/if}
   </div>

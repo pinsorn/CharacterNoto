@@ -73,9 +73,9 @@
   // Live control legend per mode (mouse scheme is FIXED; the HUD only describes it).
   const hudLines = $derived(
     possessing ? ['POV', 'Drag = look', 'WASD / arrows = move', 'Esc = exit']
-    : mode === 'tokens' ? ['Tokens', 'Left-click = select', 'Drag / click ground = move', 'Right-drag orbit · Wheel zoom', 'Q/E rotate · Possess = POV']
-    : mode === 'objects' ? ['Objects', 'Left-drag = scatter / place', 'Right-drag orbit · Wheel zoom', 'Pick prop & params below']
-    : ['Terrain', 'Left-drag = edit', 'Right-drag = orbit', 'Middle-drag pan · Wheel zoom']
+    : mode === 'tokens' ? ['Tokens', 'Left-click = select', 'Left-drag = move', 'Right-drag = orbit', 'Wheel = zoom', 'Q/E = rotate · Possess = POV']
+    : mode === 'objects' ? ['Objects', 'Left-drag = scatter / place', 'Right-drag = orbit', 'Wheel = zoom', 'Pick prop below']
+    : ['Terrain', 'Left-drag = edit', 'Right-drag = orbit', 'Middle-drag = pan', 'Wheel = zoom']
   );
   const canvasCursor = $derived(possessing ? 'cursor-grabbing' : mode === 'tokens' ? 'cursor-pointer' : 'cursor-crosshair');
 
@@ -730,9 +730,9 @@
     </div>
 
     {#if !($voxelUI.hintSeen ?? false)}
-      <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[18rem] text-[11px] bg-info text-info-content rounded shadow px-2 py-1">
-        Tip: <b>Left-drag</b> edits · <b>Right-drag</b> orbits · <b>Middle-drag</b> pans. See 🎮 anytime.
-        <button class="btn btn-xs btn-ghost ml-1 underline" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[20rem] text-[11px] bg-base-100/95 border border-primary/40 text-base-content rounded shadow px-2 py-1 flex items-center gap-2">
+        <span>Tip: <b>Left-drag</b> edits · <b>Right-drag</b> orbits · <b>Middle-drag</b> pans. See 🎮 anytime.</span>
+        <button class="btn btn-xs btn-primary shrink-0" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
       </div>
     {/if}
   </div>

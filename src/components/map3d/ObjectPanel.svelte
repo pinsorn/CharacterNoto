@@ -20,6 +20,7 @@
 </script>
 
 <div class="space-y-2 text-sm">
+  <div class="text-[10px] uppercase opacity-50">Prop</div>
   <!-- Prop picker -->
   <div class="flex flex-wrap gap-1">
     {#each allProps as p}
@@ -33,6 +34,7 @@
     {/each}
   </div>
 
+  <div class="text-[10px] uppercase opacity-50 pt-1">Brush</div>
   <!-- Mode toggle -->
   <div class="join">
     {#each ['scatter', 'place'] as m}

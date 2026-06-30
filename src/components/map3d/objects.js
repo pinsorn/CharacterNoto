@@ -113,6 +113,11 @@ const C = {
 // base at y=0, growing +Y, centred on x/z. Roughly 1–3 voxels tall, low poly.
 // ---------------------------------------------------------------------------
 
+// Remove only the scattered instances of one prop id (used by ObjectPanel's "Clear current prop").
+export function clearProp(objects, propId) {
+  return (objects ?? []).filter((o) => o.propId !== propId);
+}
+
 export const PROPS = [
   {
     id: 'pine',

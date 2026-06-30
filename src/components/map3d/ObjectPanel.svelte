@@ -5,7 +5,7 @@
   // persistence both fire. The placed-object count + "Clear objects" act on the shared `mapData`.
   import { voxelObjUI } from '../../lib/voxel/store.js';
   import { mapData } from '../../lib/stores.js';
-  import { PROPS } from './objects.js';
+  import { PROPS, clearProp } from './objects.js';
   import { customProps } from '../../lib/voxel/customProps.js';
 
   const ui = $derived($voxelObjUI);
@@ -91,11 +91,18 @@
     <span>Random yaw</span>
   </label>
 
-  <!-- Count readout + clear -->
-  <div class="flex items-center justify-between pt-1">
+  <!-- Count readout + clears -->
+  <div class="flex items-center justify-between gap-2 pt-1">
     <span class="opacity-70 text-xs">{count} placed</span>
-    <button type="button" class="btn btn-xs btn-error btn-outline" onclick={clearObjects}>
-      Clear objects
-    </button>
+    <div class="flex gap-1">
+      <button type="button" class="btn btn-xs btn-outline" disabled={count === 0}
+        onclick={() => mapData.update((d) => ({ ...d, objects: clearProp(d.objects, ui.propId) }))}>
+        Clear {allProps.find((p) => p.id === ui.propId)?.name ?? 'prop'}
+      </button>
+      <button type="button" class="btn btn-xs btn-error btn-outline" disabled={count === 0}
+        onclick={() => { if (confirm('Remove ALL placed objects?')) clearObjects(); }}>
+        Clear all
+      </button>
+    </div>
   </div>
 </div>

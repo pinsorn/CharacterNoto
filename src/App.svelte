@@ -114,7 +114,7 @@
     <div class:hidden={tab !== 'characters'}><Characters /></div>
     <div class:hidden={tab !== 'items'}><Items /></div>
     <div class:hidden={tab !== 'crafting'}><Crafting /></div>
-    {#if !viewer}<div class:hidden={tab !== '3dmap'}><Map3DTab /></div>{/if}
+    {#if !viewer}<div class:hidden={tab !== '3dmap'}><Map3DTab onOpenImageEditor={() => (tab = 'imageeditor')} /></div>{/if}
     {#if !viewer}
       <div class:hidden={tab !== 'imageeditor'} class:fixed={imgFull} class:inset-0={imgFull} class:z-50={imgFull} class:bg-base-100={imgFull} class:overflow-auto={imgFull} class:p-4={imgFull}>
         <ImageEditor onApply={applyImageMap} bind:fullscreen={imgFull} />

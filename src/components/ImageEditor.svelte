@@ -240,13 +240,14 @@
           <input type="file" accept="image/*" class="file-input file-input-bordered file-input-sm w-full" onchange={onBase} />
         </label>
         <label class="block text-xs">
-          <span class="flex justify-between"><span>Resolution — {R} px = 1 voxel</span></span>
+          <span class="flex justify-between"><span>Detail — {R} px = 1 voxel</span><span class="opacity-60">{N ? N + '×' + N + ' map' : ''}</span></span>
           <select class="select select-bordered select-sm w-full" bind:value={R}>
-            <option value={1}>1 px / voxel (finest)</option>
-            <option value={2}>2 px / voxel</option>
-            <option value={4}>4 px / voxel</option>
-            <option value={8}>8 px / voxel (coarsest)</option>
+            <option value={1}>1 px / voxel — finest, biggest map</option>
+            <option value={2}>2 px / voxel — fine</option>
+            <option value={4}>4 px / voxel — medium</option>
+            <option value={8}>8 px / voxel — coarse, smallest map</option>
           </select>
+          <span class="text-[10px] opacity-60">Fewer px per voxel = more detail and a larger map.</span>
         </label>
         {#if baseImg}
           <div class="text-xs opacity-70">
@@ -328,12 +329,14 @@
         <span class="opacity-70">Override image (optional)</span>
         <input type="file" accept="image/*" class="file-input file-input-bordered file-input-xs w-full" onchange={onObjectFile} />
       </label>
-      <div class="text-xs opacity-70">Pixel <strong>colour</strong> → which prop. Paint the object image with these:</div>
+      <div class="text-xs opacity-70">Pixel <strong>colour</strong> → which prop. Click a swatch to copy its RGB, then paint the object image with it:</div>
       <div class="flex flex-wrap gap-1">
         {#each OBJECT_KEYS.filter((k) => k.propId) as k}
-          <span class="inline-flex items-center gap-1 text-[10px] badge badge-sm badge-ghost" title="rgb({k.color[0]},{k.color[1]},{k.color[2]})">
+          <button type="button" class="inline-flex items-center gap-1 text-[10px] badge badge-sm badge-ghost cursor-pointer"
+            title="Copy rgb({k.color[0]},{k.color[1]},{k.color[2]})"
+            onclick={() => navigator.clipboard?.writeText(`rgb(${k.color[0]}, ${k.color[1]}, ${k.color[2]})`)}>
             <span class="w-3 h-3 rounded-sm border border-base-300" style="background: rgb({k.color[0]},{k.color[1]},{k.color[2]})"></span>{k.name}
-          </span>
+          </button>
         {/each}
       </div>
       <label class="block text-xs">

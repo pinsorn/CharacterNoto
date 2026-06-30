@@ -26,8 +26,7 @@
   import ObjectEditor from './map3d/ObjectEditor.svelte';
   import { customProps } from '../lib/voxel/customProps.js';
   import { buildPropGeometry } from '../lib/voxel/voxelProp.js';
-  import ImageTerrainPanel from './map3d/ImageTerrainPanel.svelte';
-  import { imageToHeights, imageToBiomes, imageToObjects } from '../lib/voxel/imageTerrain.js';
+  let { onOpenImageEditor } = $props(); // host switches to the Image Editor tab (single image→terrain entry point)
 
   const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
@@ -468,24 +467,6 @@
     scheduleTopview();
   }
 
-  // Apply an uploaded image to the terrain: height (brightness), biome (colour), or scatter objects.
-  function applyImage(imageData, mode, opts) {
-    if (manager) return; // single-chunk image import is for small maps; use the Image Editor tab for big maps
-    const n = chunk.size;
-    if (mode === 'height') {
-      chunk.height = imageToHeights(imageData, n, opts);
-      chunk.dirty = true;
-    } else if (mode === 'biome') {
-      chunk.biome = imageToBiomes(imageData, n);
-      chunk.dirty = true;
-    } else if (mode === 'object') {
-      appendObjects(imageToObjects(imageData, n, { ...opts, heightAt }));
-    }
-    rebuild();
-    scheduleSave();
-    scheduleTopview();
-  }
-
   onMount(() => {
     const w = container.clientWidth || 800, h = container.clientHeight || 460;
     scene = new THREE.Scene();
@@ -678,6 +659,7 @@
         <button class="btn btn-xs join-item {$voxelUI.tool === t.id ? 'btn-primary' : ''}" onclick={() => voxelUI.update((u) => ({ ...u, tool: t.id }))}>{t.label}</button>
       {/each}
     </div>
+    <button class="btn btn-xs btn-accent" onclick={() => onOpenImageEditor?.()} title="Build a whole map from an image (Image Editor tab)">🖼 Image → Map</button>
 
     {#if toolParams.includes('biome')}
       <select class="select select-xs select-bordered" value={$voxelUI.biomeId} onchange={(e) => voxelUI.update((u) => ({ ...u, biomeId: +e.target.value }))}>
@@ -760,12 +742,6 @@
     <div class="collapse-content"><EnvPanel minuteLabel={envMinute} /></div>
   </details>
 
-  {#if mode === 'terrain'}
-    <details class="collapse collapse-arrow bg-base-200 rounded mt-3">
-      <summary class="collapse-title text-sm font-semibold py-2 min-h-0">Import image → terrain (height · biome · objects)</summary>
-      <div class="collapse-content"><ImageTerrainPanel onApply={applyImage} /></div>
-    </details>
-  {/if}
   {#if mode === 'tokens'}
     <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} onLocate={locateToken} getSpawnCell={tokenSpawnCell} /></div>
   {/if}

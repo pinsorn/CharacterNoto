@@ -26,8 +26,7 @@
   import ObjectEditor from './map3d/ObjectEditor.svelte';
   import { customProps } from '../lib/voxel/customProps.js';
   import { buildPropGeometry } from '../lib/voxel/voxelProp.js';
-  import ImageTerrainPanel from './map3d/ImageTerrainPanel.svelte';
-  import { imageToHeights, imageToBiomes, imageToObjects } from '../lib/voxel/imageTerrain.js';
+  let { onOpenImageEditor } = $props(); // host switches to the Image Editor tab (single image→terrain entry point)
 
   const BLOCK_TOOLS = [
     { id: 'place', label: 'Place Block' },
@@ -63,11 +62,22 @@
   const ndc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
 
-  let mode = $state('terrain'); // 'terrain' | 'tokens'
+  // mode persisted in voxelUI (read defensively — persisted() doesn't merge defaults for old users)
+  let mode = $state(get(voxelUI).mode ?? 'terrain'); // 'terrain' | 'tokens' | 'objects'
+  function setMode(m) { mode = m; voxelUI.update((u) => ({ ...u, mode: m })); }
   let fs = $state(false); // full-screen the whole 3D Map tab
   let selectedTokenId = $state(null);
   let possessing = $state(false);
   const look = { yaw: 0, pitch: 0, dragging: false, px: 0, py: 0 };
+
+  // Live control legend per mode (mouse scheme is FIXED; the HUD only describes it).
+  const hudLines = $derived(
+    possessing ? ['POV', 'Drag = look', 'WASD / arrows = move', 'Esc = exit']
+    : mode === 'tokens' ? ['Tokens', 'Left-click = select', 'Left-drag = move', 'Right-drag = orbit', 'Wheel = zoom', 'Q/E = rotate · Possess = POV']
+    : mode === 'objects' ? ['Objects', 'Left-drag = scatter / place', 'Right-drag = orbit', 'Wheel = zoom', 'Pick prop below']
+    : ['Terrain', 'Left-drag = edit', 'Right-drag = orbit', 'Middle-drag = pan', 'Wheel = zoom']
+  );
+  const canvasCursor = $derived(possessing ? 'cursor-grabbing' : mode === 'tokens' ? 'cursor-pointer' : 'cursor-crosshair');
 
   // token placement helpers — chunked maps read the streaming manager; small maps the dense cache.
   const heightAt = (gx, gz) => (manager ? manager.heightAt(gx, gz) : lastDense ? surfaceY(lastDense, gx, gz, chunk.size) : 6);
@@ -457,24 +467,6 @@
     scheduleTopview();
   }
 
-  // Apply an uploaded image to the terrain: height (brightness), biome (colour), or scatter objects.
-  function applyImage(imageData, mode, opts) {
-    if (manager) return; // single-chunk image import is for small maps; use the Image Editor tab for big maps
-    const n = chunk.size;
-    if (mode === 'height') {
-      chunk.height = imageToHeights(imageData, n, opts);
-      chunk.dirty = true;
-    } else if (mode === 'biome') {
-      chunk.biome = imageToBiomes(imageData, n);
-      chunk.dirty = true;
-    } else if (mode === 'object') {
-      appendObjects(imageToObjects(imageData, n, { ...opts, heightAt }));
-    }
-    rebuild();
-    scheduleSave();
-    scheduleTopview();
-  }
-
   onMount(() => {
     const w = container.clientWidth || 800, h = container.clientHeight || 460;
     scene = new THREE.Scene();
@@ -623,9 +615,9 @@
   <div class="flex flex-wrap gap-2 items-center mb-3">
     <h2 class="text-2xl font-bold mr-auto">3D Map</h2>
     <div class="join">
-      <button class="btn btn-xs join-item {mode === 'terrain' ? 'btn-active' : ''}" onclick={() => (mode = 'terrain')}>Terrain</button>
-      <button class="btn btn-xs join-item {mode === 'tokens' ? 'btn-active' : ''}" onclick={() => (mode = 'tokens')}>Tokens</button>
-      <button class="btn btn-xs join-item {mode === 'objects' ? 'btn-active' : ''}" onclick={() => (mode = 'objects')}>Objects</button>
+      <button class="btn btn-xs join-item {mode === 'terrain' ? 'btn-active' : ''}" onclick={() => setMode('terrain')}>Terrain</button>
+      <button class="btn btn-xs join-item {mode === 'tokens' ? 'btn-active' : ''}" onclick={() => setMode('tokens')}>Tokens</button>
+      <button class="btn btn-xs join-item {mode === 'objects' ? 'btn-active' : ''}" onclick={() => setMode('objects')}>Objects</button>
     </div>
     <div class="join">
       <button class="btn btn-xs join-item {$voxelUI.cameraPreset === 'iso' ? 'btn-active' : ''}" onclick={() => setPreset('iso')}>ISO</button>
@@ -641,13 +633,18 @@
       </label>
     {/if}
     {#if !bigMap}
-      <label class="flex items-center gap-1 text-xs">Size
-        <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
-          {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
-        </select>
-      </label>
-      <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
-      <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+      <div class="dropdown dropdown-end">
+        <button tabindex="0" class="btn btn-xs btn-ghost" aria-label="Map options">⋯ Map</button>
+        <div tabindex="0" class="dropdown-content z-10 menu bg-base-200 rounded-box shadow p-2 gap-2 w-48">
+          <label class="flex items-center justify-between gap-1 text-xs">Size
+            <select class="select select-xs select-bordered" value={$voxelUI.mapSize} onchange={(e) => resizeMap(+e.target.value)}>
+              {#each MAP_SIZES as n}<option value={n}>{n}×{n}</option>{/each}
+            </select>
+          </label>
+          <button class="btn btn-xs btn-secondary" onclick={renderTopview}>Regenerate Topview</button>
+          <button class="btn btn-xs btn-ghost" onclick={resetMap}>Reset</button>
+        </div>
+      </div>
     {/if}
   </div>
 
@@ -662,6 +659,7 @@
         <button class="btn btn-xs join-item {$voxelUI.tool === t.id ? 'btn-primary' : ''}" onclick={() => voxelUI.update((u) => ({ ...u, tool: t.id }))}>{t.label}</button>
       {/each}
     </div>
+    <button class="btn btn-xs btn-accent" onclick={() => onOpenImageEditor?.()} title="Build a whole map from an image (Image Editor tab)">🖼 Image → Map</button>
 
     {#if toolParams.includes('biome')}
       <select class="select select-xs select-bordered" value={$voxelUI.biomeId} onchange={(e) => voxelUI.update((u) => ({ ...u, biomeId: +e.target.value }))}>
@@ -705,21 +703,36 @@
 
   {/if}
 
-  <div class="text-xs opacity-60 mb-2">
-    {#if possessing}POV — drag to look · WASD/arrows to move · Esc to exit
-    {:else if mode === 'tokens'}Tokens — click to select · drag OR click ground to move · type X/Z or 🎯 to locate · Q/E rotate · Possess for POV
-    {:else if mode === 'objects'}Objects — click/drag to scatter (or hand-place) props · pick prop & params below
-    {:else}Left-drag = edit · Right-drag = orbit · Wheel = zoom · Middle-drag = pan. Edits auto-save & refresh the Map tab topview.{/if}
-  </div>
-
   <div class="relative">
-    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300" style={fs ? 'height: calc(100vh - 200px);' : 'height: 460px;'}></div>
+    <div bind:this={container} class="w-full rounded overflow-hidden bg-base-300 {canvasCursor}" style={fs ? 'height: calc(100vh - 200px);' : 'height: 460px;'}></div>
     {#if possessing}
       <button class="btn btn-xs btn-error absolute top-2 right-2" onclick={exitPossession}>Exit POV (Esc)</button>
     {/if}
     {#if bigMap}
       <div class="absolute top-2 left-2 text-xs px-2 py-1 rounded bg-base-300/80 opacity-80 pointer-events-none">
         Streaming chunked map — right-drag to orbit · middle-drag to pan & explore
+      </div>
+    {/if}
+
+    <!-- Control legend HUD (mouse scheme is fixed — this just makes it discoverable) -->
+    <div class="absolute bottom-2 left-2 text-[11px] leading-tight rounded bg-base-300/85 shadow select-none">
+      <button class="flex items-center gap-1 px-2 py-1 font-semibold w-full text-left"
+        onclick={() => voxelUI.update((u) => ({ ...u, hudCollapsed: !($voxelUI.hudCollapsed ?? false) }))}
+        title="Toggle controls help">
+        <span>🎮 {hudLines[0]}</span>
+        <span class="opacity-60">{($voxelUI.hudCollapsed ?? false) ? '▸' : '▾'}</span>
+      </button>
+      {#if !($voxelUI.hudCollapsed ?? false)}
+        <div class="px-2 pb-1 opacity-80">
+          {#each hudLines.slice(1) as l}<div>{l}</div>{/each}
+        </div>
+      {/if}
+    </div>
+
+    {#if !($voxelUI.hintSeen ?? false)}
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[20rem] text-[11px] bg-base-100/95 border border-primary/40 text-base-content rounded shadow px-2 py-1 flex items-center gap-2">
+        <span><b>Right-drag</b> orbits · <b>Middle-drag</b> pans · <b>Wheel</b> zooms · <b>Left-drag</b> = the 🎮 action.</span>
+        <button class="btn btn-xs btn-primary shrink-0" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
       </div>
     {/if}
   </div>
@@ -729,12 +742,6 @@
     <div class="collapse-content"><EnvPanel minuteLabel={envMinute} /></div>
   </details>
 
-  {#if mode === 'terrain'}
-    <details class="collapse collapse-arrow bg-base-200 rounded mt-3">
-      <summary class="collapse-title text-sm font-semibold py-2 min-h-0">Import image → terrain (height · biome · objects)</summary>
-      <div class="collapse-content"><ImageTerrainPanel onApply={applyImage} /></div>
-    </details>
-  {/if}
   {#if mode === 'tokens'}
     <div class="mt-3"><TokenPanel bind:selectedId={selectedTokenId} onPossess={possess} onLocate={locateToken} getSpawnCell={tokenSpawnCell} /></div>
   {/if}

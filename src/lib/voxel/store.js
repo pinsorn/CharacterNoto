@@ -16,6 +16,9 @@ export const voxelUI = persisted('voxelUI', {
   blockId: 1,
   cameraPreset: 'iso', // iso | top
   viewDist: 6, // streaming render distance in chunks (far-LOD radius); near 2 chunks stay full detail
+  mode: 'terrain', // 3D Map authoring mode: terrain | tokens | objects (persisted; read defensively)
+  hintSeen: false, // first-visit controls hint dismissed
+  hudCollapsed: false, // control-legend HUD collapsed
 });
 
 // Object painter (spec §9): scatter / hand-place props on the terrain.

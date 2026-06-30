@@ -3,7 +3,7 @@
 // attributes + an index — for the in-house mergeColored to run, plus Group/InstancedMesh/material
 // stubs for the render layer). No WebGL, no real three import: fully self-contained.
 import assert from 'node:assert';
-import { PROPS, createObjectLayer, syncObjectLayer, scatterInstances } from './objects.js';
+import { PROPS, createObjectLayer, syncObjectLayer, scatterInstances, clearProp } from './objects.js';
 
 let pass = 0;
 let fail = 0;
@@ -148,6 +148,16 @@ t('syncObjectLayer adds one child per distinct propId', () => {
   // re-sync without 'rock' -> its mesh is removed.
   syncObjectLayer(layer, objects.filter((o) => o.propId === 'pine'), THREE);
   assert.strictEqual(layer.children.length, 1, `after removal -> ${layer.children.length} children`);
+});
+
+t('clearProp removes only the given prop', () => {
+  const objs = [{ propId: 'pine' }, { propId: 'rock' }, { propId: 'pine' }];
+  const out = clearProp(objs, 'pine');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].propId, 'rock');
+});
+t('clearProp on empty/null returns empty array', () => {
+  assert.deepEqual(clearProp(null, 'pine'), []);
 });
 
 console.log(`\nobjects: ${pass} passed, ${fail} failed`);

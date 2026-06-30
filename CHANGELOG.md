@@ -3,6 +3,34 @@ All notable changes to the Character Manager project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.15.0] - 2026-07-01
+
+### Added
+- **Control legend HUD on the 3D Map** — an always-on 🎮 overlay (bottom-left) names the current mode
+  and lists the live mouse controls (left-drag edits · right-drag orbits · middle-drag pans · wheel
+  zooms), updating per mode (Terrain / Tokens / Objects / POV). Collapsible; a one-time tip bubble
+  points it out on first visit, and the cursor reflects the active tool. The mouse scheme is
+  unchanged — this just makes it discoverable.
+- **Searchable token list** — when a map has more than six tokens, a search box filters them by name;
+  each row now shows the token's X,Z cell. The token editor is grouped into Identity / Transform /
+  Model / Notes sections so it's easier to scan.
+- **Safer object clearing** — the Objects panel can now **Clear &lt;current prop&gt;** (remove just one
+  prop type) and **Clear all** (now behind a confirm), instead of a single button that wiped
+  everything with no undo.
+
+### Changed
+- **One way to build a map from an image** — the 3D Map's in-tab "Import image → terrain" panel is
+  gone; a single **🖼 Image → Map** button opens the dedicated Image Editor (which already handles
+  small and large maps), removing the confusing duplicate path.
+- **Clearer Image Editor resolution** — the detail selector spells out the trade-off (fewer px per
+  voxel = more detail and a larger map) and shows the resulting map size; object-legend swatches are
+  now click-to-copy their RGB so the object image is easier to paint.
+- **Decluttered 3D Map toolbar** — Size / Regenerate Topview / Reset moved into a ⋯ Map menu; the
+  authoring mode is now remembered between visits.
+
+### Fixed
+- The first-visit controls tip no longer overlaps the control HUD.
+
 ## [3.14.0] - 2026-06-29
 
 ### Added

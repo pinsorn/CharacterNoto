@@ -110,7 +110,7 @@
     </div>
   </div>
 
-  {#if tokens.length > 6}
+  {#if tokens.length > 6 || query}
     <input class="input input-xs input-bordered w-full" placeholder="Search tokens…" bind:value={query} />
   {/if}
 

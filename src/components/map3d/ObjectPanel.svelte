@@ -10,6 +10,7 @@
 
   const ui = $derived($voxelObjUI);
   const count = $derived($mapData.objects?.length ?? 0);
+  const propCount = $derived(($mapData.objects ?? []).filter((o) => o.propId === ui.propId).length);
   // Built-in props + user-authored voxel props (from the Object Editor).
   const allProps = $derived([...PROPS, ...$customProps]);
 
@@ -97,7 +98,7 @@
   <div class="flex items-center justify-between gap-2 pt-1">
     <span class="opacity-70 text-xs">{count} placed</span>
     <div class="flex gap-1">
-      <button type="button" class="btn btn-xs btn-outline" disabled={count === 0}
+      <button type="button" class="btn btn-xs btn-outline" disabled={propCount === 0}
         onclick={() => mapData.update((d) => ({ ...d, objects: clearProp(d.objects, ui.propId) }))}>
         Clear {allProps.find((p) => p.id === ui.propId)?.name ?? 'prop'}
       </button>

@@ -731,7 +731,7 @@
 
     {#if !($voxelUI.hintSeen ?? false)}
       <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[20rem] text-[11px] bg-base-100/95 border border-primary/40 text-base-content rounded shadow px-2 py-1 flex items-center gap-2">
-        <span>Tip: <b>Left-drag</b> edits · <b>Right-drag</b> orbits · <b>Middle-drag</b> pans. See 🎮 anytime.</span>
+        <span><b>Right-drag</b> orbits · <b>Middle-drag</b> pans · <b>Wheel</b> zooms · <b>Left-drag</b> = the 🎮 action.</span>
         <button class="btn btn-xs btn-primary shrink-0" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
       </div>
     {/if}

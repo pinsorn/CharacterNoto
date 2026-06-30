@@ -730,7 +730,7 @@
     </div>
 
     {#if !($voxelUI.hintSeen ?? false)}
-      <div class="absolute bottom-16 left-2 max-w-[15rem] text-[11px] bg-info text-info-content rounded shadow px-2 py-1">
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 max-w-[18rem] text-[11px] bg-info text-info-content rounded shadow px-2 py-1">
         Tip: <b>Left-drag</b> edits · <b>Right-drag</b> orbits · <b>Middle-drag</b> pans. See 🎮 anytime.
         <button class="btn btn-xs btn-ghost ml-1 underline" onclick={() => voxelUI.update((u) => ({ ...u, hintSeen: true }))}>Got it</button>
       </div>

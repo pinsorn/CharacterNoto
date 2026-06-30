@@ -6,6 +6,7 @@
   import { mapData, characters } from '../../lib/stores.js';
   import { putBlob, delBlob, newImageId } from '../../lib/blobstore.js';
   import { formatFromName, SUPPORTED_MODEL_FORMATS } from './tokenModels.js';
+  import { filterTokens } from './tokenFilter.js';
 
   let { selectedId = $bindable(null), onPossess, onLocate, getSpawnCell } = $props();
 
@@ -23,6 +24,9 @@
   // Existing users may have mapData saved before `tokens` existed → guard the read.
   const tokens = $derived($mapData.tokens ?? []);
   const selected = $derived(tokens.find((t) => t.id === selectedId) ?? null);
+
+  let query = $state('');
+  const shown = $derived(filterTokens(tokens, query));
 
   let addCharId = $state('');
 
@@ -106,12 +110,16 @@
     </div>
   </div>
 
+  {#if tokens.length > 6}
+    <input class="input input-xs input-bordered w-full" placeholder="Search tokens…" bind:value={query} />
+  {/if}
+
   <!-- Token list -->
   {#if tokens.length === 0}
     <div class="text-xs opacity-60 px-1">No tokens yet. Add a generic marker or a character.</div>
   {:else}
     <div class="grid gap-1">
-      {#each tokens as t (t.id)}
+      {#each shown as t (t.id)}
         <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
         <div
           class="flex items-center gap-2 rounded p-1 cursor-pointer {selectedId === t.id ? 'bg-primary/20 ring-1 ring-primary' : 'bg-base-200'}"
@@ -120,6 +128,7 @@
           <span class="inline-block w-3 h-3 rounded-full shrink-0" style={`background:${t.color}`}></span>
           <span class="text-sm truncate mr-auto">{t.label}</span>
           <span class="badge badge-ghost badge-xs">{t.size}</span>
+          <span class="badge badge-ghost badge-xs">{t.cell?.gx ?? '?'},{t.cell?.gz ?? '?'}</span>
           {#if onLocate}
             <button class="btn btn-ghost btn-xs px-1" title="Center the 3D view on this token" aria-label="Locate"
               onclick={(e) => { e.stopPropagation(); selectedId = t.id; onLocate(t); }}>🎯</button>
@@ -132,6 +141,7 @@
   <!-- Edit area -->
   {#if selected}
     <div class="bg-base-200 rounded p-2 space-y-2">
+      <div class="text-[10px] uppercase opacity-50 pt-1">Identity</div>
       <input
         class="input input-xs input-bordered w-full"
         placeholder="Label"
@@ -157,6 +167,7 @@
         />
       </div>
 
+      <div class="text-[10px] uppercase opacity-50 pt-1">Transform</div>
       <div class="flex items-center gap-2 flex-wrap">
         <select
           class="select select-xs select-bordered"
@@ -186,6 +197,7 @@
         </label>
       </div>
 
+      <div class="text-[10px] uppercase opacity-50 pt-1">Model</div>
       <div class="flex items-center gap-2 flex-wrap text-xs">
         <span class="opacity-60">Model</span>
         <label class="btn btn-xs">{selected.modelId ? 'Replace' : 'Import GLB/OBJ/STL'}
@@ -221,6 +233,7 @@
         <span class="opacity-60">(blank = sit on surface)</span>
       </label>
 
+      <div class="text-[10px] uppercase opacity-50 pt-1">Notes</div>
       <input
         class="input input-xs input-bordered w-full"
         placeholder="Note"
